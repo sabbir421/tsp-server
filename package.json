@@ -1,0 +1,28 @@
+{
+  "name": "tsp-server",
+  "version": "1.0.0",
+  "description": "TrueSpace Property API Server",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "predev": "lsof -ti:8000 | xargs kill -9 2>/dev/null || true",
+    "dev": "nodemon src/index.js",
+    "db:init": "node src/utils/initDb.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-validator": "^7.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
+    "mysql2": "^3.11.3",
+    "nodemailer": "^6.9.16",
+    "sequelize": "^6.37.8",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

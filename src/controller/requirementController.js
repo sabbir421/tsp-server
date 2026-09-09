@@ -1,0 +1,51 @@
+const RequirementService = require('../services/requirementService');
+const { successResponse, errorResponse } = require('../utils/response');
+
+const RequirementController = {
+  async create(req, res) {
+    try {
+      const requirement = await RequirementService.create(req.user.id, req.body);
+      return successResponse(res, requirement, 'Requirement created successfully', 201);
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
+  async getMine(req, res) {
+    try {
+      const requirements = await RequirementService.getMine(req.user.id);
+      return successResponse(res, requirements, 'Requirements fetched successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
+  async getOne(req, res) {
+    try {
+      const requirement = await RequirementService.getById(req.user.id, req.params.id);
+      return successResponse(res, requirement, 'Requirement fetched successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
+  async update(req, res) {
+    try {
+      const requirement = await RequirementService.update(req.user.id, req.params.id, req.body);
+      return successResponse(res, requirement, 'Requirement updated successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
+  async remove(req, res) {
+    try {
+      const result = await RequirementService.remove(req.user.id, req.params.id);
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+};
+
+module.exports = RequirementController;
