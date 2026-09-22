@@ -27,7 +27,8 @@ const loginValidation = [
 
 const sendRegistrationOtpValidation = [
   body('phone').trim().notEmpty().withMessage('Phone number is required'),
-  body('email').trim().isEmail().withMessage('Valid email is required'),
+  body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Valid email is required'),
+  body('countryCode').optional().trim(),
   roleValidation,
 ];
 

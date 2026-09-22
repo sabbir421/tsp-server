@@ -30,9 +30,9 @@ const OtpModel = {
       role,
     };
 
-    if (type === OTP_TYPES.REGISTRATION && phone && email) {
+    if (type === OTP_TYPES.REGISTRATION && phone) {
       return OtpCode.findOne({
-        where: { ...baseWhere, phone, email },
+        where: { ...baseWhere, phone },
         order: [['createdAt', 'DESC']],
       });
     }

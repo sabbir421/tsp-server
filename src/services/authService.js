@@ -5,7 +5,7 @@ const OtpModel = require('../models/otpModel');
 const PasswordResetModel = require('../models/passwordResetModel');
 const { generateToken } = require('../utils/jwt');
 const { generateOtp } = require('../utils/otp');
-const { sendOtpEmail } = require('../utils/mailer');
+const { sendOtpSms } = require('../utils/sms');
 const { USER_ROLES, OTP_TYPES } = require('../constants');
 
 const toPlain = (record) => (record?.get ? record.get({ plain: true }) : record);
@@ -51,7 +51,6 @@ const AuthService = {
       otpCode,
       type: OTP_TYPES.REGISTRATION,
       phone,
-      email,
       role,
     });
 
@@ -78,9 +77,14 @@ const AuthService = {
     return { user: formatUser(user, role), token };
   },
 
-  async sendRegistrationOtp({ phone, email, role }) {
+  async sendRegistrationOtp({ phone, email, countryCode, role }) {
     if (!Object.values(USER_ROLES).includes(role)) {
       throw { status: 400, message: 'Invalid user role' };
+    }
+
+    const existingPhone = await UserModel.findByPhone(phone, role);
+    if (existingPhone) {
+      throw { status: 409, message: 'Phone number already registered for this account type' };
     }
 
     const otpCode = generateOtp();
@@ -92,9 +96,14 @@ const AuthService = {
       role,
     });
 
-    await sendOtpEmail({ to: email, otpCode, purpose: OTP_TYPES.REGISTRATION });
+    await sendOtpSms({
+      phone,
+      countryCode,
+      otpCode,
+      purpose: OTP_TYPES.REGISTRATION,
+    });
 
-    return { message: 'OTP sent successfully' };
+    return { message: 'OTP sent to your phone' };
   },
 
   async login({ identifier, password, role }) {
@@ -140,9 +149,14 @@ const AuthService = {
       role,
     });
 
-    await sendOtpEmail({ to: user.email, otpCode, purpose: OTP_TYPES.LOGIN });
+    await sendOtpSms({
+      phone: user.phone,
+      countryCode: user.countryCode,
+      otpCode,
+      purpose: OTP_TYPES.LOGIN,
+    });
 
-    return { message: 'OTP sent successfully' };
+    return { message: 'OTP sent to your phone' };
   },
 
   async loginWithOtp({ identifier, otpCode, role }) {
@@ -217,9 +231,14 @@ const AuthService = {
       role,
     });
 
-    await sendOtpEmail({ to: user.email, otpCode, purpose: OTP_TYPES.PASSWORD_RESET });
+    await sendOtpSms({
+      phone: user.phone,
+      countryCode: user.countryCode,
+      otpCode,
+      purpose: OTP_TYPES.PASSWORD_RESET,
+    });
 
-    return { message: 'OTP sent successfully' };
+    return { message: 'OTP sent to your phone' };
   },
 
   async resetPasswordWithToken({ token, newPassword }) {

@@ -22,8 +22,8 @@ const AuthController = {
 
   async sendRegistrationOtp(req, res) {
     try {
-      const { phone, email, role } = req.body;
-      const result = await AuthService.sendRegistrationOtp({ phone, email, role });
+      const { phone, email, countryCode, role } = req.body;
+      const result = await AuthService.sendRegistrationOtp({ phone, email, countryCode, role });
       return successResponse(res, result, result.message);
     } catch (error) {
       return errorResponse(res, error.message, error.status || 500);
