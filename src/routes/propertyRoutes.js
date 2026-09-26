@@ -6,6 +6,8 @@ const { uploadPropertyPhotos } = require('../middleware/uploadMiddleware');
 
 const router = express.Router();
 
+router.get('/public', PropertyController.getAvailable);
+router.get('/public/:id', PropertyController.getPublicById);
 router.get('/available', authenticate, PropertyController.getAvailable);
 
 router.use(authenticate, sellerOnly);

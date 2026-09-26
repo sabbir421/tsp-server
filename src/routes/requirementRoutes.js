@@ -5,6 +5,8 @@ const { buyerOnly } = require('../middleware/buyerMiddleware');
 
 const router = express.Router();
 
+router.get('/public', RequirementController.getPublic);
+
 router.use(authenticate, buyerOnly);
 
 router.get('/mine', RequirementController.getMine);

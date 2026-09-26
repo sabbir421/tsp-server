@@ -55,12 +55,16 @@ const MatchModel = {
     });
   },
 
-  async countByBuyer(buyerId) {
-    return PropertyMatch.count({ where: { buyerId } });
+  async countByRequirement(requirementId) {
+    return PropertyMatch.count({ where: { requirementId } });
   },
 
   async countBySeller(sellerId) {
     return PropertyMatch.count({ where: { sellerId } });
+  },
+
+  async countByRequirement(requirementId) {
+    return PropertyMatch.count({ where: { requirementId } });
   },
 
   async updateStatus(id, status) {

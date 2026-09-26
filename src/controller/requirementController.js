@@ -46,6 +46,15 @@ const RequirementController = {
       return errorResponse(res, error.message, error.status || 500);
     }
   },
+
+  async getPublic(req, res) {
+    try {
+      const requirements = await RequirementService.getPublic();
+      return successResponse(res, requirements, 'Requirements fetched successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
 };
 
 module.exports = RequirementController;

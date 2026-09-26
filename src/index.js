@@ -16,18 +16,10 @@ const PORT = process.env.PORT || 8000;
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (process.env.NODE_ENV === 'development' && /^http:\/\/localhost:\d+$/.test(origin)) {
-        return callback(null, true);
-      }
-      const allowed = process.env.CLIENT_URL || 'http://localhost:3000';
-      if (origin === allowed) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
+    origin: '*',
   })
 );
+Ò
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

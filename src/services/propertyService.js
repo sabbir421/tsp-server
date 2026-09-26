@@ -117,6 +117,16 @@ const formatProperty = (record) => {
   };
 };
 
+const formatPropertyForBrowse = (record) => {
+  const formatted = formatProperty(record);
+  delete formatted.contactNumber;
+  delete formatted.whatsappNumber;
+  delete formatted.preferredContact;
+  delete formatted.bestTime;
+  delete formatted.sellerId;
+  return formatted;
+};
+
 const normalizeBody = (body) => ({
   propertyType: body.propertyType,
   purpose: body.purpose,
@@ -242,7 +252,15 @@ const PropertyService = {
 
   async getAvailable() {
     const properties = await PropertyModel.findAllAvailable();
-    return properties.map(formatProperty);
+    return properties.map(formatPropertyForBrowse);
+  },
+
+  async getPublicById(id) {
+    const property = await PropertyModel.findById(id);
+    if (!property) {
+      throw { status: 404, message: 'Property not found' };
+    }
+    return formatPropertyForBrowse(property);
   },
 };
 

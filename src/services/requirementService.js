@@ -40,7 +40,19 @@ const buildSummary = (req) => {
   return parts.join(' · ');
 };
 
-const formatRequirement = (record) => {
+const formatRequirementForPublic = (record, suggestionsCount = 0) => {
+  const formatted = formatRequirement(record);
+  delete formatted.buyerId;
+  return {
+    ...formatted,
+    sector: formatted.area || formatted.zone,
+    budget: formatted.budgetDisplay,
+    budgetNote: '',
+    isLive: formatted.status === 'active',
+    suggestionsCount,
+    mustHaves: formatted.mustIncludeDetails ? [formatted.mustIncludeDetails] : [],
+  };
+};
   const data = toPlain(record);
 
   return {
@@ -169,6 +181,27 @@ const RequirementService = {
       throw err;
     }
     return { message: 'Requirement deleted successfully' };
+  },
+
+  async getPublic() {
+    const records = await RequirementModel.findAllActive();
+    const formatted = [];
+
+    for (const record of records) {
+      const req = formatRequirement(record);
+      const suggestionsCount = await MatchModel.countByRequirement(req.id);
+      delete req.buyerId;
+      formatted.push({
+        ...req,
+        sector: req.area || req.zone,
+        budget: req.budgetDisplay,
+        isLive: req.status === 'active',
+        suggestionsCount,
+        mustHaves: req.mustIncludeDetails ? [req.mustIncludeDetails] : [],
+      });
+    }
+
+    return formatted;
   },
 };
 

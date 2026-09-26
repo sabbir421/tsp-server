@@ -64,6 +64,15 @@ const PropertyController = {
       return errorResponse(res, error.message, error.status || 500);
     }
   },
+
+  async getPublicById(req, res) {
+    try {
+      const property = await PropertyService.getPublicById(req.params.id);
+      return successResponse(res, property, 'Property fetched successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
 };
 
 module.exports = PropertyController;
