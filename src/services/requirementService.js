@@ -40,19 +40,7 @@ const buildSummary = (req) => {
   return parts.join(' · ');
 };
 
-const formatRequirementForPublic = (record, suggestionsCount = 0) => {
-  const formatted = formatRequirement(record);
-  delete formatted.buyerId;
-  return {
-    ...formatted,
-    sector: formatted.area || formatted.zone,
-    budget: formatted.budgetDisplay,
-    budgetNote: '',
-    isLive: formatted.status === 'active',
-    suggestionsCount,
-    mustHaves: formatted.mustIncludeDetails ? [formatted.mustIncludeDetails] : [],
-  };
-};
+const formatRequirement = (record) => {
   const data = toPlain(record);
 
   return {
@@ -78,6 +66,20 @@ const formatRequirementForPublic = (record, suggestionsCount = 0) => {
     summary: buildSummary(data),
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
+  };
+};
+
+const formatRequirementForPublic = (record, suggestionsCount = 0) => {
+  const formatted = formatRequirement(record);
+  delete formatted.buyerId;
+  return {
+    ...formatted,
+    sector: formatted.area || formatted.zone,
+    budget: formatted.budgetDisplay,
+    budgetNote: '',
+    isLive: formatted.status === 'active',
+    suggestionsCount,
+    mustHaves: formatted.mustIncludeDetails ? [formatted.mustIncludeDetails] : [],
   };
 };
 

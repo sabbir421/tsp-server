@@ -63,8 +63,8 @@ const MatchModel = {
     return PropertyMatch.count({ where: { sellerId } });
   },
 
-  async countByRequirement(requirementId) {
-    return PropertyMatch.count({ where: { requirementId } });
+  async countByBuyer(buyerId) {
+    return PropertyMatch.count({ where: { buyerId } });
   },
 
   async updateStatus(id, status) {
