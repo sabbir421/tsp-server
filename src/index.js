@@ -86,29 +86,29 @@ app.use((err, req, res, next) => {
 });
 
 const startServer = async () => {
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(
+        `Port ${PORT} is already in use. Run: lsof -ti:${PORT} | xargs kill -9`
+      );
+      console.error("Or set a different PORT in server/.env");
+    } else {
+      console.error("Failed to start server:", error.message);
+    }
+    process.exit(1);
+  });
+
   try {
     await sequelize.authenticate();
     console.log("MySQL connected successfully");
     await sequelize.sync({ alter: true });
-
-    const server = app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-
-    server.on("error", (error) => {
-      if (error.code === "EADDRINUSE") {
-        console.error(
-          `Port ${PORT} is already in use. Run: lsof -ti:${PORT} | xargs kill -9`
-        );
-        console.error("Or set a different PORT in server/.env");
-      } else {
-        console.error("Failed to start server:", error.message);
-      }
-      process.exit(1);
-    });
+    console.log("Database synced successfully");
   } catch (error) {
-    console.error("Failed to start server:", error.message);
-    process.exit(1);
+    console.error("Database connection/sync warning:", error.message);
   }
 };
 
