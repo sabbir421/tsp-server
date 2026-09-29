@@ -26,12 +26,15 @@ const formatBudget = (amount) => {
 };
 
 const buildTitle = (req) => {
+  if (!req) return '';
   const size = req.sizeSqFt ? `${req.sizeSqFt} sft ` : '';
   const location = [req.zone, req.city].filter(Boolean).join(', ');
-  return `${size}${req.subType} in ${location || req.city}`;
+  const subType = req.subType || 'Property';
+  return `${size}${subType} in ${location || req.city || ''}`;
 };
 
 const buildSummary = (req) => {
+  if (!req) return '';
   const parts = [
     req.category === 'residential' ? 'Residential' : 'Commercial',
     req.bedrooms ? `${req.bedrooms} Bed` : null,
@@ -41,24 +44,26 @@ const buildSummary = (req) => {
 };
 
 const formatRequirement = (record) => {
+  if (!record) return null;
   const data = toPlain(record);
+  if (!data) return null;
 
   return {
     id: data.id,
     buyerId: data.buyerId,
     category: data.category,
-    subType: data.subType,
-    residentialNotes: data.residentialNotes,
-    bedrooms: data.bedrooms,
-    sizeSqFt: data.sizeSqFt,
-    floor: data.floor,
-    totalFloors: data.totalFloors,
-    area: data.area,
-    zone: data.zone,
-    city: data.city,
-    mustInclude: data.mustInclude,
-    mustIncludeDetails: data.mustIncludeDetails,
-    maxBudget: data.maxBudget,
+    subType: data.subType || '',
+    residentialNotes: data.residentialNotes || null,
+    bedrooms: data.bedrooms || null,
+    sizeSqFt: data.sizeSqFt || null,
+    floor: data.floor || null,
+    totalFloors: data.totalFloors || null,
+    area: data.area || null,
+    zone: data.zone || null,
+    city: data.city || '',
+    mustInclude: !!data.mustInclude,
+    mustIncludeDetails: data.mustIncludeDetails || null,
+    maxBudget: data.maxBudget || 0,
     budgetDisplay: formatBudget(data.maxBudget),
     status: data.status,
     statusLabel: data.status === 'active' ? 'Active' : data.status === 'matched' ? 'Matched' : 'Closed',
@@ -71,11 +76,12 @@ const formatRequirement = (record) => {
 
 const formatRequirementForPublic = (record, suggestionsCount = 0) => {
   const formatted = formatRequirement(record);
+  if (!formatted) return null;
   delete formatted.buyerId;
   return {
     ...formatted,
-    sector: formatted.area || formatted.zone,
-    budget: formatted.budgetDisplay,
+    sector: formatted.area || formatted.zone || '',
+    budget: formatted.budgetDisplay || '',
     budgetNote: '',
     isLive: formatted.status === 'active',
     suggestionsCount,
@@ -190,15 +196,17 @@ const RequirementService = {
     const formatted = [];
 
     for (const record of records) {
+      if (!record) continue;
       const req = formatRequirement(record);
-      const suggestionsCount = await MatchModel.countByRequirement(req.id);
+      if (!req) continue;
+      const suggestionsCount = await MatchModel.countByRequirement(req.id).catch(() => 0);
       delete req.buyerId;
       formatted.push({
         ...req,
-        sector: req.area || req.zone,
-        budget: req.budgetDisplay,
+        sector: req.area || req.zone || '',
+        budget: req.budgetDisplay || '',
         isLive: req.status === 'active',
-        suggestionsCount,
+        suggestionsCount: suggestionsCount || 0,
         mustHaves: req.mustIncludeDetails ? [req.mustIncludeDetails] : [],
       });
     }
