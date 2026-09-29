@@ -65,7 +65,8 @@ const parsePhotos = (photos) => {
   if (Array.isArray(photos)) return photos;
   if (typeof photos === 'string') {
     try {
-      return JSON.parse(photos);
+      const parsed = JSON.parse(photos);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -76,6 +77,10 @@ const parsePhotos = (photos) => {
 const formatProperty = (record) => {
   const data = toPlain(record);
   const photoPaths = parsePhotos(data.photos);
+
+  const cleanPhotos = photoPaths
+    .filter((p) => typeof p === 'string' && p.trim())
+    .map((p) => `/uploads/properties/${path.basename(p)}`);
 
   return {
     id: data.id,
@@ -105,7 +110,7 @@ const formatProperty = (record) => {
     whatsappNumber: data.whatsappNumber,
     preferredContact: parseJsonField(data.preferredContact, []),
     bestTime: data.bestTime,
-    photos: photoPaths.map((p) => `/uploads/properties/${path.basename(p)}`),
+    photos: cleanPhotos,
     status: data.status,
     statusLabel: STATUS_LABELS[data.status] || data.status,
     views: data.views,
