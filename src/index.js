@@ -14,14 +14,58 @@ const { errorResponse } = require("./utils/response");
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-app.use(
-  cors({
-    origin: "*",
-  })
-);
+const allowedOrigins = [
+  "https://truespaceproperty.com",
+  "https://www.truespaceproperty.com",
+  "http://localhost:3000",
+  "http://localhost:3001",
+];
+
+if (process.env.CLIENT_URL) {
+  const customUrl = process.env.CLIENT_URL.replace(/\/$/, "");
+  if (!allowedOrigins.includes(customUrl)) {
+    allowedOrigins.push(customUrl);
+  }
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/(.*\.)?truespaceproperty\.com$/.test(origin) ||
+      process.env.NODE_ENV !== "production"
+    ) {
+      return callback(null, true);
+    }
+
+    // Dynamic origin reflection fallback to avoid CORS blocks
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "Authorization",
+    "RSC",
+    "Next-Router-State-Tree",
+    "Next-Router-Prefetch",
+    "Next-Url",
+  ],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/uploads", cors(corsOptions), express.static(path.join(__dirname, "../uploads")));
 
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "TrueSpace Property API is running" });
