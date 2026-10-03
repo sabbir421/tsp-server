@@ -2,8 +2,8 @@ const { body } = require('express-validator');
 const { USER_ROLES } = require('../constants');
 
 const roleValidation = body('role')
-  .notEmpty()
-  .withMessage('Role is required')
+  .optional({ checkFalsy: true })
+  .default(USER_ROLES.SELLER)
   .isIn(Object.values(USER_ROLES))
   .withMessage('Invalid role');
 
@@ -13,6 +13,7 @@ const registerValidation = [
   body('phone').trim().notEmpty().withMessage('Phone number is required'),
   body('countryCode').optional().trim(),
   body('password')
+    .optional({ checkFalsy: true })
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters'),
   roleValidation,

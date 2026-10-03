@@ -29,9 +29,11 @@ const formatUser = (user, role) => {
 
 const AuthService = {
   async register({ fullName, email, phone, countryCode, password, role, otpCode }) {
-    if (!Object.values(USER_ROLES).includes(role)) {
+    const userRole = role || USER_ROLES.SELLER;
+    if (!Object.values(USER_ROLES).includes(userRole)) {
       throw { status: 400, message: 'Invalid user role' };
     }
+    role = userRole;
 
     const existingEmail = await UserModel.findByEmail(email, role);
     if (existingEmail) {
@@ -58,7 +60,8 @@ const AuthService = {
       throw { status: 400, message: 'Invalid or expired OTP. Please resend OTP and try again.' };
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const rawPassword = password || uuidv4();
+    const hashedPassword = await bcrypt.hash(rawPassword, 12);
     const userId = await UserModel.create({
       fullName,
       email,
@@ -78,9 +81,11 @@ const AuthService = {
   },
 
   async sendRegistrationOtp({ phone, email, countryCode, role }) {
-    if (!Object.values(USER_ROLES).includes(role)) {
+    const userRole = role || USER_ROLES.SELLER;
+    if (!Object.values(USER_ROLES).includes(userRole)) {
       throw { status: 400, message: 'Invalid user role' };
     }
+    role = userRole;
 
     const existingPhone = await UserModel.findByPhone(phone, role);
     if (existingPhone) {
