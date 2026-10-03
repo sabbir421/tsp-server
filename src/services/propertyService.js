@@ -1,19 +1,20 @@
-const fs = require('fs');
-const path = require('path');
-const PropertyModel = require('../models/propertyModel');
-const { PROPERTY_STATUS } = require('../schema/propertySchema');
+const fs = require("fs");
+const path = require("path");
+const PropertyModel = require("../models/propertyModel");
+const { PROPERTY_STATUS } = require("../schema/propertySchema");
 
-const toPlain = (record) => (record?.get ? record.get({ plain: true }) : record);
+const toPlain = (record) =>
+  record?.get ? record.get({ plain: true }) : record;
 
 const STATUS_LABELS = {
-  pending: 'Pending Approval',
-  verified: 'Verified',
-  matched: 'Matched',
+  pending: "Pending Approval",
+  verified: "Verified",
+  matched: "Matched",
 };
 
 const parseJsonField = (value, fallback = []) => {
   if (Array.isArray(value)) return value;
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     try {
       return JSON.parse(value);
     } catch {
@@ -23,10 +24,11 @@ const parseJsonField = (value, fallback = []) => {
   return fallback;
 };
 
-const parseBool = (value) => value === true || value === 'true' || value === 'yes';
+const parseBool = (value) =>
+  value === true || value === "true" || value === "yes";
 
 const parseNumber = (value) => {
-  if (value === '' || value === null || value === undefined) return null;
+  if (value === "" || value === null || value === undefined) return null;
   const num = Number(value);
   return Number.isNaN(num) ? null : num;
 };
@@ -36,34 +38,34 @@ const formatPrice = (price, propertyFor) => {
   if (Number.isNaN(num)) return String(price);
 
   if (num >= 10000000) {
-    return `${(num / 10000000).toFixed(2).replace(/\.?0+$/, '')} Cr`;
+    return `${(num / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`;
   }
   if (num >= 100000) {
-    return `${(num / 100000).toFixed(2).replace(/\.?0+$/, '')} L`;
+    return `${(num / 100000).toFixed(2).replace(/\.?0+$/, "")} L`;
   }
-  if (propertyFor === 'rent') {
-    return `${num.toLocaleString('en-BD')} /mo`;
+  if (propertyFor === "rent") {
+    return `${num.toLocaleString("en-BD")} /mo`;
   }
-  return num.toLocaleString('en-BD');
+  return num.toLocaleString("en-BD");
 };
 
 const buildTitle = (property) => {
-  const size = property.sizeSqFt ? `${property.sizeSqFt} sft ` : '';
+  const size = property.sizeSqFt ? `${property.sizeSqFt} sft ` : "";
   return `${size}${property.propertyType} in ${property.area}`;
 };
 
 const buildMeta = (property) => {
   const parts = [
-    property.propertyFor === 'sale' ? 'Sale' : 'Rent',
+    property.propertyFor === "sale" ? "Sale" : "Rent",
     property.bedrooms ? `${property.bedrooms} Bed` : null,
     property.bathrooms ? `${property.bathrooms} Bath` : null,
   ].filter(Boolean);
-  return parts.join(' • ');
+  return parts.join(" • ");
 };
 
 const parsePhotos = (photos) => {
   if (Array.isArray(photos)) return photos;
-  if (typeof photos === 'string') {
+  if (typeof photos === "string") {
     try {
       const parsed = JSON.parse(photos);
       return Array.isArray(parsed) ? parsed : [];
@@ -79,7 +81,7 @@ const formatProperty = (record) => {
   const photoPaths = parsePhotos(data.photos);
 
   const cleanPhotos = photoPaths
-    .filter((p) => typeof p === 'string' && p.trim())
+    .filter((p) => typeof p === "string" && p.trim())
     .map((p) => `/uploads/properties/${path.basename(p)}`);
 
   return {
@@ -111,7 +113,7 @@ const formatProperty = (record) => {
     preferredContact: parseJsonField(data.preferredContact, []),
     bestTime: data.bestTime,
     photos: cleanPhotos,
-    status: data.status,
+    status: "verified",
     statusLabel: STATUS_LABELS[data.status] || data.status,
     views: data.views,
     leads: data.leads,
@@ -160,18 +162,21 @@ const normalizeBody = (body) => ({
 });
 
 const validatePropertyData = (data) => {
-  if (!data.propertyType) throw { status: 400, message: 'Property type is required' };
-  if (!data.area) throw { status: 400, message: 'Area / locality is required' };
-  if (!data.city) throw { status: 400, message: 'City is required' };
-  if (!data.address) throw { status: 400, message: 'Address is required' };
-  if (!data.price || data.price <= 0) throw { status: 400, message: 'Valid price is required' };
-  if (!data.contactNumber) throw { status: 400, message: 'Contact number is required' };
+  if (!data.propertyType)
+    throw { status: 400, message: "Property type is required" };
+  if (!data.area) throw { status: 400, message: "Area / locality is required" };
+  if (!data.city) throw { status: 400, message: "City is required" };
+  if (!data.address) throw { status: 400, message: "Address is required" };
+  if (!data.price || data.price <= 0)
+    throw { status: 400, message: "Valid price is required" };
+  if (!data.contactNumber)
+    throw { status: 400, message: "Contact number is required" };
 };
 
 const getPhotoFilenames = (files) => (files || []).map((f) => f.filename);
 
 const deletePhotoFiles = (photos) => {
-  const uploadsDir = path.join(__dirname, '../../uploads/properties');
+  const uploadsDir = path.join(__dirname, "../../uploads/properties");
   (photos || []).forEach((photo) => {
     const filename = path.basename(photo);
     const filePath = path.join(uploadsDir, filename);
@@ -206,7 +211,7 @@ const PropertyService = {
   async getById(sellerId, id) {
     const property = await PropertyModel.findByIdAndSeller(id, sellerId);
     if (!property) {
-      throw { status: 404, message: 'Property not found' };
+      throw { status: 404, message: "Property not found" };
     }
     return formatProperty(property);
   },
@@ -214,7 +219,7 @@ const PropertyService = {
   async update(sellerId, id, body, files) {
     const existing = await PropertyModel.findByIdAndSeller(id, sellerId);
     if (!existing) {
-      throw { status: 404, message: 'Property not found' };
+      throw { status: 404, message: "Property not found" };
     }
 
     const data = normalizeBody(body);
@@ -242,13 +247,13 @@ const PropertyService = {
   async remove(sellerId, id) {
     const property = await PropertyModel.findByIdAndSeller(id, sellerId);
     if (!property) {
-      throw { status: 404, message: 'Property not found' };
+      throw { status: 404, message: "Property not found" };
     }
 
     const data = toPlain(property);
     deletePhotoFiles(parsePhotos(data.photos));
     await PropertyModel.delete(id, sellerId);
-    return { message: 'Property deleted successfully' };
+    return { message: "Property deleted successfully" };
   },
 
   async getStats(sellerId) {
@@ -263,7 +268,7 @@ const PropertyService = {
   async getPublicById(id) {
     const property = await PropertyModel.findById(id);
     if (!property) {
-      throw { status: 404, message: 'Property not found' };
+      throw { status: 404, message: "Property not found" };
     }
     return formatPropertyForBrowse(property);
   },
