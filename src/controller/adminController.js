@@ -1,4 +1,5 @@
-const { BuyerTenant, SellerAgent, Property, Requirement, PropertyMatch, OtpCode } = require('../schema');
+const bcrypt = require('bcryptjs');
+const { BuyerTenant, SellerAgent, Property, Requirement, PropertyMatch, OtpCode, AdminUser } = require('../schema');
 const { generateToken } = require('../utils/jwt');
 const { successResponse, errorResponse } = require('../utils/response');
 
@@ -7,16 +8,40 @@ const AdminController = {
   async login(req, res) {
     try {
       const { email, password } = req.body;
-      const adminEmail = process.env.ADMIN_EMAIL || 'sabbiralazim@gmail.com';
-      const adminPass = process.env.ADMIN_PASSWORD || '123456';
+      const cleanEmail = (email || '').toLowerCase().trim();
 
+      // Check AdminUser database table first
+      if (AdminUser) {
+        try {
+          const dbAdmin = await AdminUser.findOne({ where: { email: cleanEmail } });
+          if (dbAdmin) {
+            const isMatch = await bcrypt.compare(password, dbAdmin.password);
+            if (isMatch) {
+              const token = generateToken({ id: dbAdmin.id, role: 'admin', email: dbAdmin.email });
+              return successResponse(res, {
+                token,
+                user: {
+                  id: dbAdmin.id,
+                  fullName: dbAdmin.fullName,
+                  email: dbAdmin.email,
+                  role: 'admin',
+                },
+              }, 'Admin login successful');
+            }
+          }
+        } catch (dbErr) {
+          console.warn('AdminUser table query fallback:', dbErr.message);
+        }
+      }
+
+      // Fallback static credentials
       const validAdmins = [
         { email: 'sabbiralazim@gmail.com', pass: '123456', name: 'Sabbir Al Azim' },
         { email: 'admin@truespaceproperty.com', pass: 'admin123456', name: 'Platform Administrator' },
-        { email: adminEmail, pass: adminPass, name: 'Admin User' },
+        { email: (process.env.ADMIN_EMAIL || '').toLowerCase(), pass: process.env.ADMIN_PASSWORD, name: 'Admin User' },
       ];
 
-      const match = validAdmins.find((a) => a.email.toLowerCase() === (email || '').toLowerCase().trim() && a.pass === password);
+      const match = validAdmins.find((a) => a.email && a.email.toLowerCase() === cleanEmail && a.pass === password);
 
       if (match) {
         const token = generateToken({ id: 999999, role: 'admin', email: match.email });
@@ -38,41 +63,150 @@ const AdminController = {
     }
   },
 
+  // Admin Account Creation & Management
+  async getAdmins(req, res) {
+    try {
+      let admins = [];
+      if (AdminUser) {
+        admins = await AdminUser.findAll({
+          attributes: { exclude: ['password'] },
+          order: [['createdAt', 'DESC']],
+        });
+      }
+
+      // Always include default admin in list if not already present
+      const defaultAdmin = {
+        id: 999999,
+        fullName: 'Sabbir Al Azim',
+        email: 'sabbiralazim@gmail.com',
+        role: 'super_admin',
+        isActive: true,
+        createdAt: new Date(),
+      };
+
+      const hasDefault = admins.some((a) => a.email.toLowerCase() === defaultAdmin.email.toLowerCase());
+      if (!hasDefault) {
+        admins.unshift(defaultAdmin);
+      }
+
+      return successResponse(res, admins, 'Admins fetched successfully');
+    } catch (err) {
+      console.error('getAdmins error:', err);
+      return errorResponse(res, 'Failed to fetch admin accounts', 500);
+    }
+  },
+
+  async createAdmin(req, res) {
+    try {
+      const { fullName, email, password } = req.body;
+      if (!fullName || !email || !password) {
+        return errorResponse(res, 'Full name, email, and password are required', 400);
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+
+      if (AdminUser) {
+        const existing = await AdminUser.findOne({ where: { email: cleanEmail } });
+        if (existing) {
+          return errorResponse(res, 'An admin with this email address already exists', 409);
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newAdmin = await AdminUser.create({
+          fullName: fullName.trim(),
+          email: cleanEmail,
+          password: hashedPassword,
+          role: 'admin',
+          isActive: true,
+        });
+
+        const plain = newAdmin.toJSON();
+        delete plain.password;
+        return successResponse(res, plain, 'New admin account created successfully', 201);
+      }
+
+      return errorResponse(res, 'Admin database service unavailable', 500);
+    } catch (err) {
+      console.error('createAdmin error:', err);
+      return errorResponse(res, err.message || 'Failed to create admin account', 500);
+    }
+  },
+
+  async deleteAdmin(req, res) {
+    try {
+      const { id } = req.params;
+      if (Number(id) === 999999) {
+        return errorResponse(res, 'Cannot delete primary root super admin account', 400);
+      }
+      if (AdminUser) {
+        await AdminUser.destroy({ where: { id } });
+      }
+      return successResponse(res, null, 'Admin account deleted successfully');
+    } catch (err) {
+      console.error('deleteAdmin error:', err);
+      return errorResponse(res, 'Failed to delete admin account', 500);
+    }
+  },
+
   // Dashboard Stats & Analytics
   async getDashboardStats(req, res) {
     try {
-      const [
-        totalSellers,
-        totalBuyers,
-        totalProperties,
-        pendingProperties,
-        verifiedProperties,
-        matchedProperties,
-        totalRequirements,
-        totalMatches,
-        acceptedMatches,
-        completedVisits,
-        totalOtps,
-      ] = await Promise.all([
-        SellerAgent.count(),
-        BuyerTenant.count(),
-        Property.count(),
-        Property.count({ where: { status: 'pending' } }),
-        Property.count({ where: { status: 'verified' } }),
-        Property.count({ where: { status: 'matched' } }),
-        Requirement.count(),
-        PropertyMatch.count(),
-        PropertyMatch.count({ where: { status: 'accepted' } }),
-        PropertyMatch.count({ where: { siteVisitStatus: 'completed' } }),
-        OtpCode.count(),
-      ]);
+      let totalSellers = 0;
+      let totalBuyers = 0;
+      let totalProperties = 0;
+      let pendingProperties = 0;
+      let verifiedProperties = 0;
+      let matchedProperties = 0;
+      let totalRequirements = 0;
+      let totalMatches = 0;
+      let acceptedMatches = 0;
+      let completedVisits = 0;
+      let totalOtps = 0;
 
-      // Recent 5 activities across properties & matches
-      const [recentProperties, recentRequirements, recentMatches] = await Promise.all([
-        Property.findAll({ limit: 5, order: [['createdAt', 'DESC']] }),
-        Requirement.findAll({ limit: 5, order: [['createdAt', 'DESC']] }),
-        PropertyMatch.findAll({ limit: 5, order: [['createdAt', 'DESC']] }),
-      ]);
+      let recentProperties = [];
+      let recentRequirements = [];
+      let recentMatches = [];
+
+      try {
+        totalSellers = await SellerAgent.count();
+      } catch (e) { console.warn('Count sellers err:', e.message); }
+
+      try {
+        totalBuyers = await BuyerTenant.count();
+      } catch (e) { console.warn('Count buyers err:', e.message); }
+
+      try {
+        totalProperties = await Property.count();
+        pendingProperties = await Property.count({ where: { status: 'pending' } });
+        verifiedProperties = await Property.count({ where: { status: 'verified' } });
+        matchedProperties = await Property.count({ where: { status: 'matched' } });
+      } catch (e) { console.warn('Count properties err:', e.message); }
+
+      try {
+        totalRequirements = await Requirement.count();
+      } catch (e) { console.warn('Count requirements err:', e.message); }
+
+      try {
+        totalMatches = await PropertyMatch.count();
+        acceptedMatches = await PropertyMatch.count({ where: { status: 'interested' } });
+        completedVisits = await PropertyMatch.count({ where: { visitStatus: 'completed' } });
+      } catch (e) { console.warn('Count matches err:', e.message); }
+
+      try {
+        totalOtps = await OtpCode.count();
+      } catch (e) { console.warn('Count OTPs err:', e.message); }
+
+      try {
+        recentProperties = await Property.findAll({ limit: 5, order: [['createdAt', 'DESC']] });
+      } catch (e) { console.warn('Recent properties err:', e.message); }
+
+      try {
+        recentRequirements = await Requirement.findAll({ limit: 5, order: [['createdAt', 'DESC']] });
+      } catch (e) { console.warn('Recent requirements err:', e.message); }
+
+      try {
+        recentMatches = await PropertyMatch.findAll({ limit: 5, order: [['createdAt', 'DESC']] });
+      } catch (e) { console.warn('Recent matches err:', e.message); }
 
       return successResponse(res, {
         metrics: {

@@ -31,4 +31,8 @@ router.delete('/requirements/:id', AdminController.deleteRequirement);
 router.get('/matches', AdminController.getMatches);
 router.get('/otp-logs', AdminController.getOtpLogs);
 
+router.get('/admins', AdminController.getAdmins);
+router.post('/admins', AdminController.createAdmin);
+router.delete('/admins/:id', AdminController.deleteAdmin);
+
 module.exports = router;

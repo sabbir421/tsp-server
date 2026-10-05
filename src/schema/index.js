@@ -6,6 +6,7 @@ const PasswordResetToken = require('./passwordResetSchema');
 const Property = require('./propertySchema');
 const Requirement = require('./requirementSchema');
 const PropertyMatch = require('./matchSchema');
+const AdminUser = require('./adminUserSchema');
 
 module.exports = {
   BuyerTenant,
@@ -16,4 +17,5 @@ module.exports = {
   Property,
   Requirement,
   PropertyMatch,
+  AdminUser,
 };
