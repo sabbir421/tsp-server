@@ -9,6 +9,7 @@ const authRoutes = require("./routes/authRoutes");
 const propertyRoutes = require("./routes/propertyRoutes");
 const requirementRoutes = require("./routes/requirementRoutes");
 const matchRoutes = require("./routes/matchRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const { errorResponse } = require("./utils/response");
 
 const app = express();
@@ -19,6 +20,8 @@ const allowedOrigins = [
   "https://www.truespaceproperty.com",
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://localhost:3002",
+  "http://localhost:5173",
 ];
 
 if (process.env.CLIENT_URL) {
@@ -75,6 +78,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/properties", propertyRoutes);
 app.use("/api/requirements", requirementRoutes);
 app.use("/api/matches", matchRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use((req, res) => {
   errorResponse(res, "Route not found", 404);
