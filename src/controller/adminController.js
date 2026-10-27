@@ -435,6 +435,110 @@ const AdminController = {
       return errorResponse(res, 'Failed to fetch OTP logs', 500);
     }
   },
+
+  // User Verification Badge
+  async updateUserBadge(req, res) {
+    try {
+      const { role, id } = req.params;
+      const { verificationStatus, verificationBadge } = req.body;
+      const Model = role === 'seller_agent' ? SellerAgent : BuyerTenant;
+      const user = await Model.findByPk(id);
+      if (!user) return errorResponse(res, 'User not found', 404);
+
+      await user.update({
+        verificationStatus: verificationStatus || user.verificationStatus,
+        verificationBadge: verificationBadge !== undefined ? verificationBadge : user.verificationBadge,
+      });
+
+      return successResponse(res, user, 'User verification updated');
+    } catch (err) {
+      console.error('Admin updateUserBadge error:', err);
+      return errorResponse(res, 'Failed to update user badge', 500);
+    }
+  },
+
+  // Moderation Reports
+  async getReports(req, res) {
+    try {
+      const { Report } = require('../schema');
+      const reports = await Report.findAll({
+        order: [['createdAt', 'DESC']],
+      });
+      return successResponse(res, reports, 'Reports fetched successfully');
+    } catch (err) {
+      console.error('Admin getReports error:', err);
+      return errorResponse(res, 'Failed to fetch reports', 500);
+    }
+  },
+
+  async updateReportStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const { Report } = require('../schema');
+      const report = await Report.findByPk(id);
+      if (!report) return errorResponse(res, 'Report not found', 404);
+
+      await report.update({ status });
+      return successResponse(res, report, 'Report status updated');
+    } catch (err) {
+      console.error('Admin updateReportStatus error:', err);
+      return errorResponse(res, 'Failed to update report', 500);
+    }
+  },
+
+  // Blog / Content Management
+  async getPosts(req, res) {
+    try {
+      const { BlogPost } = require('../schema');
+      const posts = await BlogPost.findAll({
+        order: [['createdAt', 'DESC']],
+      });
+      return successResponse(res, posts, 'Posts fetched successfully');
+    } catch (err) {
+      console.error('Admin getPosts error:', err);
+      return errorResponse(res, 'Failed to fetch posts', 500);
+    }
+  },
+
+  async createPost(req, res) {
+    try {
+      const { BlogPost } = require('../schema');
+      const post = await BlogPost.create(req.body);
+      return successResponse(res, post, 'Post created successfully', 201);
+    } catch (err) {
+      console.error('Admin createPost error:', err);
+      return errorResponse(res, 'Failed to create post', 500);
+    }
+  },
+
+  async updatePost(req, res) {
+    try {
+      const { id } = req.params;
+      const { BlogPost } = require('../schema');
+      const post = await BlogPost.findByPk(id);
+      if (!post) return errorResponse(res, 'Post not found', 404);
+
+      await post.update(req.body);
+      return successResponse(res, post, 'Post updated successfully');
+    } catch (err) {
+      console.error('Admin updatePost error:', err);
+      return errorResponse(res, 'Failed to update post', 500);
+    }
+  },
+
+  async deletePost(req, res) {
+    try {
+      const { id } = req.params;
+      const { BlogPost } = require('../schema');
+      const count = await BlogPost.destroy({ where: { id } });
+      if (!count) return errorResponse(res, 'Post not found', 404);
+      return successResponse(res, null, 'Post deleted successfully');
+    } catch (err) {
+      console.error('Admin deletePost error:', err);
+      return errorResponse(res, 'Failed to delete post', 500);
+    }
+  },
 };
 
 module.exports = AdminController;

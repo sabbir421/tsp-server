@@ -7,6 +7,8 @@ const Property = require('./propertySchema');
 const Requirement = require('./requirementSchema');
 const PropertyMatch = require('./matchSchema');
 const AdminUser = require('./adminUserSchema');
+const Report = require('./reportSchema');
+const BlogPost = require('./blogPostSchema');
 
 module.exports = {
   BuyerTenant,
@@ -18,4 +20,6 @@ module.exports = {
   Requirement,
   PropertyMatch,
   AdminUser,
+  Report,
+  BlogPost,
 };

@@ -44,6 +44,20 @@ const sharedUserFields = {
     allowNull: false,
     defaultValue: true,
   },
+  verificationStatus: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    defaultValue: 'unverified',
+  },
+  verificationBadge: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  documents: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: {},
+  },
 };
 
 module.exports = sharedUserFields;

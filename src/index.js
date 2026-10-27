@@ -111,6 +111,8 @@ const startServer = async () => {
     console.log("MySQL connected successfully");
     await sequelize.sync({ alter: true });
     console.log("Database synced successfully");
+    const seedData = require("./utils/seedPrototypeData");
+    await seedData();
   } catch (error) {
     console.error("Database connection/sync warning:", error.message);
   }
