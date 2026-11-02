@@ -1,20 +1,20 @@
-const fs = require("fs");
-const path = require("path");
-const PropertyModel = require("../models/propertyModel");
-const { PROPERTY_STATUS } = require("../schema/propertySchema");
+const path = require('path');
+const PropertyModel = require('../models/propertyModel');
+const { PROPERTY_STATUS } = require('../schema/propertySchema');
+const { uploadMulterFiles, uploadMulterFile } = require('../utils/s3Service');
 
-const toPlain = (record) =>
-  record?.get ? record.get({ plain: true }) : record;
+const toPlain = (record) => (record?.get ? record.get({ plain: true }) : record);
 
 const STATUS_LABELS = {
-  pending: "Pending Approval",
-  verified: "Verified",
-  matched: "Matched",
+  pending: 'Pending Approval',
+  verified: 'Verified',
+  matched: 'Matched',
 };
 
 const parseJsonField = (value, fallback = []) => {
-  if (Array.isArray(value)) return value;
-  if (typeof value === "string") {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  if (typeof value === 'string') {
     try {
       return JSON.parse(value);
     } catch {
@@ -24,76 +24,66 @@ const parseJsonField = (value, fallback = []) => {
   return fallback;
 };
 
-const parseBool = (value) =>
-  value === true || value === "true" || value === "yes";
+const parseBool = (value) => value === true || value === 'true' || value === 'yes';
 
 const parseNumber = (value) => {
-  if (value === "" || value === null || value === undefined) return null;
+  if (value === '' || value === null || value === undefined) return null;
   const num = Number(value);
   return Number.isNaN(num) ? null : num;
 };
 
 const formatPrice = (price, propertyFor) => {
   const num = Number(price);
-  if (Number.isNaN(num)) return String(price);
+  if (Number.isNaN(num) || !num) return String(price || '0');
 
   if (num >= 10000000) {
-    return `${(num / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`;
+    return `৳ ${(num / 10000000).toFixed(2).replace(/\.?0+$/, '')} Crore`;
   }
   if (num >= 100000) {
-    return `${(num / 100000).toFixed(2).replace(/\.?0+$/, "")} L`;
+    return `৳ ${(num / 100000).toFixed(2).replace(/\.?0+$/, '')} Lakh`;
   }
-  if (propertyFor === "rent") {
-    return `${num.toLocaleString("en-BD")} /mo`;
+  if (propertyFor === 'rent') {
+    return `৳ ${num.toLocaleString('en-BD')} / month`;
   }
-  return num.toLocaleString("en-BD");
+  return `৳ ${num.toLocaleString('en-BD')}`;
 };
 
-const buildTitle = (property) => {
-  const size = property.sizeSqFt ? `${property.sizeSqFt} sft ` : "";
-  return `${size}${property.propertyType} in ${property.area}`;
+const buildTitle = (p) => {
+  if (p.title && p.title.trim()) return p.title.trim();
+  const cat = p.cat || p.propertyType || 'Property';
+  const beds = p.bedrooms ? `${p.bedrooms}-bed ` : '';
+  const area = p.area || 'Dhaka';
+  return `${beds}${cat} in ${area}`;
 };
 
-const buildMeta = (property) => {
-  const parts = [
-    property.propertyFor === "sale" ? "Sale" : "Rent",
-    property.bedrooms ? `${property.bedrooms} Bed` : null,
-    property.bathrooms ? `${property.bathrooms} Bath` : null,
-  ].filter(Boolean);
-  return parts.join(" • ");
-};
-
-const parsePhotos = (photos) => {
-  if (Array.isArray(photos)) return photos;
-  if (typeof photos === "string") {
-    try {
-      const parsed = JSON.parse(photos);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
+const SQFT_MAP = {
+  Katha: 720,
+  Bigha: 14400,
+  'Square Feet': 1,
+  Acre: 43560,
 };
 
 const formatProperty = (record) => {
   const data = toPlain(record);
-  const photoPaths = parsePhotos(data.photos);
-
-  const cleanPhotos = photoPaths
-    .filter((p) => typeof p === "string" && p.trim())
-    .map((p) => `/uploads/properties/${path.basename(p)}`);
+  const photos = parseJsonField(data.photos, []);
+  const documents = parseJsonField(data.documents, []);
+  const mx = parseJsonField(data.mx, {});
+  const vt = parseJsonField(data.vt, {});
 
   return {
     id: data.id,
     sellerId: data.sellerId,
+    title: data.title || buildTitle(data),
+    provider: data.provider || 'Owner',
     propertyType: data.propertyType,
-    purpose: data.purpose,
+    cat: data.mx?.cat || (data.propertyType === 'Plot' ? 'Land' : data.propertyType === 'Commercial' ? 'Commercial Space' : 'Flat'),
+    purpose: data.purpose || (data.propertyFor === 'rent' ? 'Rent' : 'Sale'),
     propertyFor: data.propertyFor,
     area: data.area,
     sector: data.sector,
-    city: data.city,
+    city: data.city || 'Dhaka',
     address: data.address,
+    map: data.map,
     sizeSqFt: data.sizeSqFt,
     landAreaKatha: data.landAreaKatha,
     price: data.price,
@@ -112,13 +102,19 @@ const formatProperty = (record) => {
     whatsappNumber: data.whatsappNumber,
     preferredContact: parseJsonField(data.preferredContact, []),
     bestTime: data.bestTime,
-    photos: cleanPhotos,
-    status: "verified",
+    ownerName: data.ownerName,
+    ownerPhone: data.ownerPhone || data.contactNumber,
+    visit: data.visit,
+    photos,
+    floorPlan: data.floorPlan,
+    videoUrl: data.videoUrl,
+    documents,
+    mx,
+    vt,
+    status: data.status || 'pending',
     statusLabel: STATUS_LABELS[data.status] || data.status,
-    views: data.views,
-    leads: data.leads,
-    title: buildTitle(data),
-    meta: buildMeta(data),
+    views: data.views || 0,
+    leads: data.leads || 0,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };
@@ -131,59 +127,99 @@ const formatPropertyForBrowse = (record) => {
   delete formatted.preferredContact;
   delete formatted.bestTime;
   delete formatted.sellerId;
+  delete formatted.address; // private in TSP
+  delete formatted.ownerPhone;
   return formatted;
 };
 
-const normalizeBody = (body) => ({
-  propertyType: body.propertyType,
-  purpose: body.purpose,
-  propertyFor: body.propertyFor,
-  area: body.area?.trim(),
-  sector: body.sector?.trim() || null,
-  city: body.city,
-  address: body.address?.trim(),
-  sizeSqFt: parseNumber(body.sizeSqFt),
-  landAreaKatha: parseNumber(body.landAreaKatha),
-  price: parseNumber(body.price),
-  priceNegotiable: parseBool(body.priceNegotiable),
-  bedrooms: body.bedrooms || null,
-  bathrooms: body.bathrooms || null,
-  balcony: body.balcony || null,
-  floor: parseNumber(body.floor),
-  totalFloors: parseNumber(body.totalFloors),
-  amenities: parseJsonField(body.amenities),
-  otherAmenity: body.otherAmenity?.trim() || null,
-  useMap: parseBool(body.useMap),
-  location: body.location?.trim() || null,
-  contactNumber: body.contactNumber?.trim(),
-  whatsappNumber: body.whatsappNumber?.trim() || null,
-  preferredContact: parseJsonField(body.preferredContact),
-  bestTime: body.bestTime || null,
-});
+const normalizeBody = (body) => {
+  const mx = parseJsonField(body.mx, {});
+  const vt = parseJsonField(body.vt, {});
 
-const validatePropertyData = (data) => {
-  if (!data.propertyType)
-    throw { status: 400, message: "Property type is required" };
-  if (!data.area) throw { status: 400, message: "Area / locality is required" };
-  if (!data.city) throw { status: 400, message: "City is required" };
-  if (!data.address) throw { status: 400, message: "Address is required" };
-  if (!data.price || data.price <= 0)
-    throw { status: 400, message: "Valid price is required" };
-  if (!data.contactNumber)
-    throw { status: 400, message: "Contact number is required" };
+  const purpose = body.purpose || (body.propertyFor === 'rent' ? 'Rent' : 'Sale');
+  const propertyFor = (body.propertyFor || (purpose === 'Rent' ? 'rent' : 'sale')).toLowerCase();
+
+  const cat = body.cat || (body.propertyType === 'Plot' ? 'Land' : body.propertyType === 'Commercial' ? 'Commercial Space' : 'Flat');
+  let propertyType = body.propertyType;
+  if (!propertyType) {
+    if (cat === 'Land') propertyType = 'Plot';
+    else if (cat === 'Commercial Space') propertyType = 'Commercial';
+    else propertyType = mx.aptType || 'Apartment';
+  }
+
+  // Calculate size in sqft
+  let sizeSqFt = parseNumber(body.sizeSqFt || mx.size);
+  let landAreaKatha = parseNumber(body.landAreaKatha);
+  if (cat === 'Land' && mx.lsize) {
+    const lsize = Number(mx.lsize);
+    const multiplier = SQFT_MAP[mx.lunit] || 720;
+    if (lsize > 0) {
+      sizeSqFt = Math.round(lsize * multiplier);
+      if (mx.lunit === 'Katha') landAreaKatha = lsize;
+      else landAreaKatha = Number((sizeSqFt / 720).toFixed(2));
+    }
+  }
+
+  // Calculate price
+  const price = parseNumber(body.price || mx.price) || 0;
+
+  const bedrooms = cat === 'Flat' ? String(mx.beds || body.bedrooms || '') : null;
+  const bathrooms = cat === 'Land' ? null : String(mx.baths || body.bathrooms || '');
+  const balcony = cat === 'Flat' ? String(mx.balc || body.balcony || '') : null;
+  const floor = cat === 'Land' ? '-' : String(mx.flevel || body.floor || '');
+  const totalFloors = parseNumber(mx.tfloors || body.totalFloors);
+
+  const amenities = Array.isArray(mx.amen)
+    ? mx.amen
+    : parseJsonField(body.amenities, []);
+
+  const contactNumber = (body.ownerPhone || body.contactNumber || '').trim();
+  const ownerName = (body.ownerName || '').trim();
+  const ownerPhone = (body.ownerPhone || contactNumber).trim();
+
+  return {
+    title: (body.title || '').trim(),
+    provider: body.provider || 'Owner',
+    propertyType,
+    purpose,
+    propertyFor,
+    area: (body.area || '').trim(),
+    sector: (body.sector || '').trim() || null,
+    city: body.city || 'Dhaka',
+    address: (body.address || '').trim(),
+    map: body.map || null,
+    sizeSqFt,
+    landAreaKatha,
+    price,
+    priceNegotiable: parseBool(body.priceNegotiable),
+    bedrooms,
+    bathrooms,
+    balcony,
+    floor,
+    totalFloors,
+    amenities,
+    otherAmenity: body.otherAmenity?.trim() || null,
+    useMap: parseBool(body.useMap ?? true),
+    location: body.location?.trim() || null,
+    contactNumber: contactNumber || '01000000000',
+    whatsappNumber: body.whatsappNumber?.trim() || null,
+    preferredContact: parseJsonField(body.preferredContact, []),
+    bestTime: body.bestTime || null,
+    ownerName,
+    ownerPhone,
+    visit: body.visit || 'Weekends',
+    floorPlan: body.floorPlan || null,
+    videoUrl: body.videoUrl || null,
+    mx,
+    vt,
+  };
 };
 
-const getPhotoFilenames = (files) => (files || []).map((f) => f.filename);
-
-const deletePhotoFiles = (photos) => {
-  const uploadsDir = path.join(__dirname, "../../uploads/properties");
-  (photos || []).forEach((photo) => {
-    const filename = path.basename(photo);
-    const filePath = path.join(uploadsDir, filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  });
+const validatePropertyData = (data) => {
+  if (!data.propertyType) throw { status: 400, message: 'Property type is required' };
+  if (!data.area) throw { status: 400, message: 'Property area / location is required' };
+  if (!data.address) throw { status: 400, message: 'Property exact address is required' };
+  if (!data.price || data.price <= 0) throw { status: 400, message: 'Valid price is required' };
 };
 
 const PropertyService = {
@@ -191,11 +227,48 @@ const PropertyService = {
     const data = normalizeBody(body);
     validatePropertyData(data);
 
-    const photos = getPhotoFilenames(files);
+    // Process uploaded files with AWS S3
+    let photos = parseJsonField(body.photos, []);
+    let documents = parseJsonField(body.documents, []);
+    let floorPlan = body.floorPlan || null;
+
+    if (Array.isArray(files) && files.length > 0) {
+      const photoFiles = files.filter((f) => f.fieldname === 'photos' || f.fieldname === 'photo');
+      const docFiles = files.filter((f) => f.fieldname === 'documents' || f.fieldname.includes('doc'));
+      const fpFiles = files.filter((f) => f.fieldname === 'floorPlan');
+
+      if (photoFiles.length) {
+        const uploadedPhotos = await uploadMulterFiles(photoFiles, 'properties');
+        photos = [...photos, ...uploadedPhotos];
+      }
+
+      if (docFiles.length) {
+        const uploadedDocs = await uploadMulterFiles(docFiles, 'documents');
+        documents = [...documents, ...uploadedDocs];
+      }
+
+      if (fpFiles.length) {
+        floorPlan = await uploadMulterFile(fpFiles[0], 'floorplans');
+      }
+
+      // Handle any verification tag files
+      const vtFiles = files.filter((f) => f.fieldname.startsWith('vt_'));
+      if (vtFiles.length && data.vt) {
+        for (const file of vtFiles) {
+          const uploadedUrl = await uploadMulterFile(file, 'verification');
+          // Add to data.vt structure if needed
+          data.vt.uploadedUrls = data.vt.uploadedUrls || [];
+          data.vt.uploadedUrls.push({ name: file.originalname, url: uploadedUrl });
+        }
+      }
+    }
+
     const propertyId = await PropertyModel.create({
       sellerId,
       ...data,
       photos,
+      documents,
+      floorPlan,
       status: PROPERTY_STATUS.PENDING,
     });
 
@@ -211,7 +284,7 @@ const PropertyService = {
   async getById(sellerId, id) {
     const property = await PropertyModel.findByIdAndSeller(id, sellerId);
     if (!property) {
-      throw { status: 404, message: "Property not found" };
+      throw { status: 404, message: 'Property not found' };
     }
     return formatProperty(property);
   },
@@ -219,27 +292,47 @@ const PropertyService = {
   async update(sellerId, id, body, files) {
     const existing = await PropertyModel.findByIdAndSeller(id, sellerId);
     if (!existing) {
-      throw { status: 404, message: "Property not found" };
+      throw { status: 404, message: 'Property not found' };
     }
 
     const data = normalizeBody(body);
     validatePropertyData(data);
 
     const existingData = toPlain(existing);
-    let photos = parsePhotos(existingData.photos);
+    let photos = parseJsonField(existingData.photos, []);
+    let documents = parseJsonField(existingData.documents, []);
+    let floorPlan = existingData.floorPlan;
 
     if (body.keepPhotos) {
-      const keep = parseJsonField(body.keepPhotos);
-      const removed = photos.filter((p) => !keep.includes(path.basename(p)));
-      deletePhotoFiles(removed);
+      const keep = parseJsonField(body.keepPhotos, []);
       photos = keep;
     }
 
-    if (files?.length) {
-      photos = [...photos, ...getPhotoFilenames(files)];
+    if (Array.isArray(files) && files.length > 0) {
+      const photoFiles = files.filter((f) => f.fieldname === 'photos' || f.fieldname === 'photo');
+      const docFiles = files.filter((f) => f.fieldname === 'documents' || f.fieldname.includes('doc'));
+      const fpFiles = files.filter((f) => f.fieldname === 'floorPlan');
+
+      if (photoFiles.length) {
+        const uploadedPhotos = await uploadMulterFiles(photoFiles, 'properties');
+        photos = [...photos, ...uploadedPhotos];
+      }
+      if (docFiles.length) {
+        const uploadedDocs = await uploadMulterFiles(docFiles, 'documents');
+        documents = [...documents, ...uploadedDocs];
+      }
+      if (fpFiles.length) {
+        floorPlan = await uploadMulterFile(fpFiles[0], 'floorplans');
+      }
     }
 
-    await PropertyModel.update(id, sellerId, { ...data, photos });
+    await PropertyModel.update(id, sellerId, {
+      ...data,
+      photos,
+      documents,
+      floorPlan,
+    });
+
     const property = await PropertyModel.findById(id);
     return formatProperty(property);
   },
@@ -247,13 +340,10 @@ const PropertyService = {
   async remove(sellerId, id) {
     const property = await PropertyModel.findByIdAndSeller(id, sellerId);
     if (!property) {
-      throw { status: 404, message: "Property not found" };
+      throw { status: 404, message: 'Property not found' };
     }
-
-    const data = toPlain(property);
-    deletePhotoFiles(parsePhotos(data.photos));
     await PropertyModel.delete(id, sellerId);
-    return { message: "Property deleted successfully" };
+    return { message: 'Property deleted successfully' };
   },
 
   async getStats(sellerId) {
@@ -268,7 +358,7 @@ const PropertyService = {
   async getPublicById(id) {
     const property = await PropertyModel.findById(id);
     if (!property) {
-      throw { status: 404, message: "Property not found" };
+      throw { status: 404, message: 'Property not found' };
     }
     return formatPropertyForBrowse(property);
   },

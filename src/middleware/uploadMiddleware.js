@@ -1,39 +1,31 @@
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
 
-const uploadsDir = path.join(__dirname, '../../uploads/properties');
+const storage = multer.memoryStorage();
 
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const ALLOWED_IMAGE = /^image\//;
-const ALLOWED_VIDEO = /^video\/(mp4|webm|ogg|quicktime)$/;
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `${uuidv4()}${ext}`);
-  },
-});
+const ALLOWED_MIME = /^(image\/(jpeg|jpg|png|webp|heic|heif)|video\/(mp4|webm|ogg|quicktime|3gpp)|application\/pdf)$/i;
+const ALLOWED_EXT = /\.(jpe?g|png|webp|heic|heif|mp4|webm|ogg|mov|3gp|pdf)$/i;
 
 const fileFilter = (req, file, cb) => {
-  if (ALLOWED_IMAGE.test(file.mimetype) || ALLOWED_VIDEO.test(file.mimetype)) {
+  const mimeMatch = ALLOWED_MIME.test(file.mimetype || '');
+  const extMatch = ALLOWED_EXT.test(file.originalname || '');
+
+  if (mimeMatch || extMatch) {
     cb(null, true);
   } else {
-    cb(new Error('Only image or video files are allowed (JPG, PNG, MP4, WEBM)'), false);
+    cb(new Error(`File type not allowed for ${file.originalname}. Allowed: Images (JPG, PNG, WEBP), Videos (MP4, MOV, WEBM), Documents (PDF, JPG, PNG)`), false);
   }
 };
 
-const uploadPropertyPhotos = multer({
+const uploadPropertyFiles = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024, files: 10 },
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB per file
+    files: 30, // Up to 30 files total across photos, documents, verification
+  },
 });
 
-module.exports = { uploadPropertyPhotos, uploadsDir };
+module.exports = {
+  uploadPropertyPhotos: uploadPropertyFiles,
+  uploadPropertyFiles,
+};

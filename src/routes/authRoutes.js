@@ -37,5 +37,7 @@ router.post('/reset-password-otp', resetPasswordOtpValidation, validateRequest, 
 
 router.get('/profile', authenticate, AuthController.getProfile);
 router.put('/profile', authenticate, profileUpdateValidation, validateRequest, AuthController.updateProfile);
+router.put('/update-password', authenticate, AuthController.updatePassword);
+router.post('/change-password', authenticate, AuthController.updatePassword);
 
 module.exports = router;

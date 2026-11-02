@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { PropertyMatch } = require('../schema');
 
 const MatchModel = {
@@ -55,6 +56,34 @@ const MatchModel = {
     });
   },
 
+  async findSiteVisitsBySeller(sellerId) {
+    return PropertyMatch.findAll({
+      where: {
+        sellerId,
+        [Op.or]: [
+          { visitRequested: true },
+          { status: 'interested' },
+          { visitStatus: { [Op.in]: ['pending', 'confirmed', 'completed', 'rescheduled'] } },
+        ],
+      },
+      order: [['updatedAt', 'DESC']],
+    });
+  },
+
+  async findSiteVisitsByBuyer(buyerId) {
+    return PropertyMatch.findAll({
+      where: {
+        buyerId,
+        [Op.or]: [
+          { visitRequested: true },
+          { status: 'interested' },
+          { visitStatus: { [Op.in]: ['pending', 'confirmed', 'completed', 'rescheduled'] } },
+        ],
+      },
+      order: [['updatedAt', 'DESC']],
+    });
+  },
+
   async countByRequirement(requirementId) {
     return PropertyMatch.count({ where: { requirementId } });
   },
@@ -74,6 +103,11 @@ const MatchModel = {
 
   async updateVisitStatus(id, visitStatus) {
     const [count] = await PropertyMatch.update({ visitStatus }, { where: { id } });
+    return count > 0;
+  },
+
+  async updateViewingRequest(id, visitData) {
+    const [count] = await PropertyMatch.update(visitData, { where: { id } });
     return count > 0;
   },
 

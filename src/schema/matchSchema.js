@@ -9,8 +9,12 @@ const MATCH_STATUS = {
 };
 
 const VISIT_STATUS = {
+  NONE: 'none',
   PENDING: 'pending',
+  CONFIRMED: 'confirmed',
   COMPLETED: 'completed',
+  RESCHEDULED: 'rescheduled',
+  DECLINED: 'declined',
 };
 
 const PropertyMatch = sequelize.define(
@@ -47,30 +51,70 @@ const PropertyMatch = sequelize.define(
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM('sent', 'viewed', 'interested', 'declined'),
+      type: DataTypes.STRING(50),
       allowNull: false,
       defaultValue: 'sent',
     },
+    visitRequested: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     visitStatus: {
-      type: DataTypes.ENUM('pending', 'completed'),
+      type: DataTypes.STRING(50),
       allowNull: false,
       defaultValue: 'pending',
+    },
+    visitDate: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    visitSlot: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    visitMode: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      defaultValue: 'direct',
+    },
+    visitPeople: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 1,
+    },
+    visitNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    visitRequestedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    proposedDate: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    proposedTime: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    buyerName: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    buyerPhone: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    buyerEmail: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
     },
   },
   {
     tableName: 'property_matches',
     timestamps: true,
-    indexes: [
-      {
-        unique: true,
-        fields: ['requirement_id', 'property_id'],
-      },
-      {
-        unique: true,
-        name: 'property_matches_requirement_seller_unique',
-        fields: ['requirement_id', 'seller_id'],
-      },
-    ],
   }
 );
 

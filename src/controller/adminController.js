@@ -321,9 +321,45 @@ const AdminController = {
         whereClause.status = status;
       }
 
-      let properties = await Property.findAll({
+      let records = await Property.findAll({
         where: whereClause,
         order: [['createdAt', 'DESC']],
+      });
+
+      const sellerIds = [...new Set(records.map((r) => r.sellerId).filter(Boolean))];
+      const sellers = sellerIds.length > 0 ? await SellerAgent.findAll({ where: { id: sellerIds } }) : [];
+      const sellerMap = {};
+      sellers.forEach((s) => {
+        const plain = s.get ? s.get({ plain: true }) : s;
+        sellerMap[plain.id] = plain;
+      });
+
+      const parseJson = (val, fallback = []) => {
+        if (!val) return fallback;
+        if (typeof val === 'object') return val;
+        try {
+          return JSON.parse(val);
+        } catch {
+          return fallback;
+        }
+      };
+
+      let properties = records.map((record) => {
+        const data = record.get ? record.get({ plain: true }) : record;
+        const seller = sellerMap[data.sellerId] || null;
+        const photos = parseJson(data.photos, []);
+        const documents = parseJson(data.documents, []);
+        return {
+          ...data,
+          photos: Array.isArray(photos) ? photos : [],
+          documents: Array.isArray(documents) ? documents : [],
+          contactNumber: data.contactNumber || seller?.phone || 'N/A',
+          ownerName: data.ownerName || seller?.fullName || 'Property Owner',
+          sellerName: seller?.fullName || 'Seller',
+          sellerPhone: seller?.phone || data.contactNumber || 'N/A',
+          sellerEmail: seller?.email || 'N/A',
+          sector: data.sector || data.area || 'Dhaka',
+        };
       });
 
       if (search) {
@@ -375,8 +411,43 @@ const AdminController = {
   async getRequirements(req, res) {
     try {
       const { search } = req.query;
-      let requirements = await Requirement.findAll({
+      const records = await Requirement.findAll({
         order: [['createdAt', 'DESC']],
+      });
+
+      const buyerIds = [...new Set(records.map((r) => r.buyerId).filter(Boolean))];
+      const buyers = buyerIds.length > 0 ? await BuyerTenant.findAll({ where: { id: buyerIds } }) : [];
+      const buyerMap = {};
+      buyers.forEach((b) => {
+        const plain = b.get ? b.get({ plain: true }) : b;
+        buyerMap[plain.id] = {
+          id: plain.id,
+          fullName: plain.fullName || 'Verified Buyer',
+          phone: plain.phone || '',
+          email: plain.email || '',
+          verificationStatus: plain.verificationStatus || 'verified',
+          isPhoneVerified: !!plain.isPhoneVerified,
+        };
+      });
+
+      let requirements = records.map((record) => {
+        const data = record.get ? record.get({ plain: true }) : record;
+        const size = data.sizeSqFt ? `${data.sizeSqFt} sft ` : '';
+        const location = [data.area, data.zone, data.city].filter(Boolean).join(', ');
+        const subType = data.subType || (data.category === 'commercial' ? 'Commercial Space' : 'Apartment');
+        const title = `${size}${subType} in ${location || data.city || 'Dhaka'}`;
+        const buyerInfo = buyerMap[data.buyerId] || null;
+
+        return {
+          ...data,
+          title,
+          sector: data.area || data.zone || data.city || 'Dhaka',
+          description: data.mustIncludeDetails || data.residentialNotes || `${subType} requirement in ${location}`,
+          buyer: buyerInfo,
+          buyerName: buyerInfo?.fullName || `Buyer #${data.buyerId}`,
+          buyerPhone: buyerInfo?.phone || 'N/A',
+          buyerEmail: buyerInfo?.email || 'N/A',
+        };
       });
 
       if (search) {
@@ -385,6 +456,7 @@ const AdminController = {
           (r) =>
             (r.title && r.title.toLowerCase().includes(q)) ||
             (r.area && r.area.toLowerCase().includes(q)) ||
+            (r.sector && r.sector.toLowerCase().includes(q)) ||
             (r.city && r.city.toLowerCase().includes(q)) ||
             (r.category && r.category.toLowerCase().includes(q))
         );

@@ -5,6 +5,27 @@ const PUBLIC_ATTRIBUTES = {
   exclude: ['password'],
 };
 
+function getPhoneVariations(phone) {
+  const raw = String(phone || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  const variations = [{ phone: raw }];
+
+  if (digits.length >= 10) {
+    const local11 = digits.length === 11 ? digits : '0' + digits.slice(-10);
+    const withoutZero = local11.slice(1);
+    const withPlusCountry = '+88' + local11;
+    const withCountryDigits = '88' + local11;
+
+    variations.push(
+      { phone: local11 },
+      { phone: withoutZero },
+      { phone: withPlusCountry },
+      { phone: withCountryDigits }
+    );
+  }
+  return variations;
+}
+
 const UserModel = {
   getModelByRole,
 
@@ -27,14 +48,24 @@ const UserModel = {
 
   async findByPhone(phone, role) {
     const Model = getModelByRole(role);
-    return Model.findOne({ where: { phone } });
+    if (!Model) return null;
+    const phoneVars = getPhoneVariations(phone);
+    return Model.findOne({
+      where: {
+        [Op.or]: phoneVars,
+      },
+    });
   },
 
   async findByIdentifierAndRole(identifier, role) {
     const Model = getModelByRole(role);
+    if (!Model) return null;
+    const raw = String(identifier || '').trim();
+    const phoneVars = getPhoneVariations(raw);
+
     return Model.findOne({
       where: {
-        [Op.or]: [{ email: identifier }, { phone: identifier }],
+        [Op.or]: [{ email: raw }, ...phoneVars],
       },
     });
   },

@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../utils/response');
 const RequirementController = {
   async create(req, res) {
     try {
-      const requirement = await RequirementService.create(req.user.id, req.body);
+      const requirement = await RequirementService.create(req.user?.id, req.body);
       return successResponse(res, requirement, 'Requirement created successfully', 201);
     } catch (error) {
       console.error('Error in requirementController.create:', error);

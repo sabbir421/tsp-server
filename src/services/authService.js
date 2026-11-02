@@ -112,13 +112,28 @@ const AuthService = {
   },
 
   async login({ identifier, password, role }) {
-    if (!Object.values(USER_ROLES).includes(role)) {
-      throw { status: 400, message: 'Invalid user role' };
+    let user = null;
+    let actualRole = role;
+
+    if (role && Object.values(USER_ROLES).includes(role)) {
+      user = await UserModel.findByIdentifierAndRole(identifier, role);
     }
 
-    const user = await UserModel.findByIdentifierAndRole(identifier, role);
     if (!user) {
-      throw { status: 401, message: 'Invalid credentials for selected role' };
+      const allRoles = Object.values(USER_ROLES);
+      for (const r of allRoles) {
+        if (r === role) continue;
+        const candidate = await UserModel.findByIdentifierAndRole(identifier, r);
+        if (candidate) {
+          user = candidate;
+          actualRole = r;
+          break;
+        }
+      }
+    }
+
+    if (!user) {
+      throw { status: 401, message: 'Invalid credentials or user not found' };
     }
 
     if (!user.isActive) {
@@ -130,18 +145,37 @@ const AuthService = {
       throw { status: 401, message: 'Invalid credentials' };
     }
 
-    const token = generateToken({ id: user.id, role, email: user.email });
-    return { user: formatUser(user, role), token };
+    const token = generateToken({ id: user.id, role: actualRole, email: user.email });
+    return { user: formatUser(user, actualRole), token, role: actualRole };
   },
 
   async sendLoginOtp({ identifier, role }) {
-    if (!Object.values(USER_ROLES).includes(role)) {
-      throw { status: 400, message: 'Invalid user role' };
+    let user = null;
+    let actualRole = role;
+
+    if (role && Object.values(USER_ROLES).includes(role)) {
+      user = await UserModel.findByIdentifierAndRole(identifier, role);
     }
 
-    const user = await UserModel.findByIdentifierAndRole(identifier, role);
     if (!user) {
-      throw { status: 404, message: 'No account found for this role' };
+      const allRoles = Object.values(USER_ROLES);
+      for (const r of allRoles) {
+        if (r === role) continue;
+        const candidate = await UserModel.findByIdentifierAndRole(identifier, r);
+        if (candidate) {
+          user = candidate;
+          actualRole = r;
+          break;
+        }
+      }
+    }
+
+    if (!user) {
+      throw { status: 404, message: 'No account found with this phone number or email' };
+    }
+
+    if (!user.isActive) {
+      throw { status: 403, message: 'Account is deactivated' };
     }
 
     const otpCode = generateOtp();
@@ -151,7 +185,7 @@ const AuthService = {
       email: user.email,
       otpCode,
       type: OTP_TYPES.LOGIN,
-      role,
+      role: actualRole,
     });
 
     await sendOtpSms({
@@ -161,17 +195,36 @@ const AuthService = {
       purpose: OTP_TYPES.LOGIN,
     });
 
-    return { message: 'OTP sent to your phone' };
+    return { message: 'OTP sent to your phone', detectedRole: actualRole };
   },
 
   async loginWithOtp({ identifier, otpCode, role }) {
-    if (!Object.values(USER_ROLES).includes(role)) {
-      throw { status: 400, message: 'Invalid user role' };
+    let user = null;
+    let actualRole = role;
+
+    if (role && Object.values(USER_ROLES).includes(role)) {
+      user = await UserModel.findByIdentifierAndRole(identifier, role);
     }
 
-    const user = await UserModel.findByIdentifierAndRole(identifier, role);
     if (!user) {
-      throw { status: 401, message: 'Invalid credentials for selected role' };
+      const allRoles = Object.values(USER_ROLES);
+      for (const r of allRoles) {
+        if (r === role) continue;
+        const candidate = await UserModel.findByIdentifierAndRole(identifier, r);
+        if (candidate) {
+          user = candidate;
+          actualRole = r;
+          break;
+        }
+      }
+    }
+
+    if (!user) {
+      throw { status: 401, message: 'Invalid credentials or user not found' };
+    }
+
+    if (!user.isActive) {
+      throw { status: 403, message: 'Account is deactivated' };
     }
 
     const validOtp = await OtpModel.findValid({
@@ -179,7 +232,7 @@ const AuthService = {
       type: OTP_TYPES.LOGIN,
       phone: user.phone,
       email: user.email,
-      role,
+      role: actualRole,
     });
 
     if (!validOtp) {
@@ -187,8 +240,8 @@ const AuthService = {
     }
 
     await OtpModel.markUsed(validOtp.id);
-    const token = generateToken({ id: user.id, role, email: user.email });
-    return { user: formatUser(user, role), token };
+    const token = generateToken({ id: user.id, role: actualRole, email: user.email });
+    return { user: formatUser(user, actualRole), token, role: actualRole };
   },
 
   async forgotPassword({ identifier, role }) {
@@ -286,6 +339,45 @@ const AuthService = {
     await OtpModel.markUsed(validOtp.id);
 
     return { message: 'Password reset successfully' };
+  },
+
+  async updatePassword(userId, role, { currentPassword, newPassword }) {
+    if (!newPassword || newPassword.length < 6) {
+      throw { status: 400, message: 'New password must be at least 6 characters' };
+    }
+
+    if (role === 'admin') {
+      const { AdminUser } = require('../schema');
+      const admin = await AdminUser.findByPk(userId);
+      if (!admin) {
+        throw { status: 404, message: 'Admin account not found' };
+      }
+      if (admin.password) {
+        const isMatch = await bcrypt.compare(currentPassword, admin.password);
+        if (!isMatch) {
+          throw { status: 400, message: 'Current password is incorrect' };
+        }
+      }
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await admin.update({ password: hashedPassword });
+      return { message: 'Admin password updated successfully' };
+    }
+
+    const user = await UserModel.findById(userId, role);
+    if (!user) {
+      throw { status: 404, message: 'User not found' };
+    }
+
+    if (user.password) {
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        throw { status: 400, message: 'Current password is incorrect' };
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await UserModel.updatePassword(userId, hashedPassword, role);
+    return { message: 'Password updated successfully' };
   },
 
   async getProfile(userId, role) {

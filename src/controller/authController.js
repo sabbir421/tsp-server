@@ -111,6 +111,15 @@ const AuthController = {
       return errorResponse(res, error.message, error.status || 500);
     }
   },
+
+  async updatePassword(req, res) {
+    try {
+      const result = await AuthService.updatePassword(req.user.id, req.user.role, req.body);
+      return successResponse(res, result, result.message);
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
 };
 
 module.exports = AuthController;

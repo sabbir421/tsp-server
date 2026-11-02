@@ -1,7 +1,40 @@
 const PropertyService = require('../services/propertyService');
+const { uploadMulterFile } = require('../utils/s3Service');
 const { successResponse, errorResponse } = require('../utils/response');
 
 const PropertyController = {
+  async uploadFiles(req, res) {
+    try {
+      const files = req.files || [];
+      if (!files.length) {
+        return errorResponse(res, 'No files provided for upload', 400);
+      }
+
+      const uploaded = await Promise.all(
+        files.map(async (file) => {
+          const folder = file.fieldname === 'documents' || file.fieldname.includes('doc')
+            ? 'documents'
+            : file.fieldname.includes('video')
+            ? 'videos'
+            : 'properties';
+          const url = await uploadMulterFile(file, folder);
+          return {
+            fieldname: file.fieldname,
+            originalname: file.originalname,
+            url,
+            size: file.size,
+            mimetype: file.mimetype,
+          };
+        })
+      );
+
+      return successResponse(res, uploaded, 'Files uploaded successfully to S3', 201);
+    } catch (error) {
+      console.error('Error in propertyController.uploadFiles:', error);
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
   async create(req, res) {
     try {
       const property = await PropertyService.create(req.user.id, req.body, req.files);

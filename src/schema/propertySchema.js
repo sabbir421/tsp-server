@@ -19,6 +19,15 @@ const Property = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    title: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    provider: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      defaultValue: 'Owner',
+    },
     propertyType: {
       type: DataTypes.STRING(50),
       allowNull: false,
@@ -30,6 +39,7 @@ const Property = sequelize.define(
     propertyFor: {
       type: DataTypes.ENUM('sale', 'rent'),
       allowNull: false,
+      defaultValue: 'sale',
     },
     area: {
       type: DataTypes.STRING(255),
@@ -42,6 +52,7 @@ const Property = sequelize.define(
     city: {
       type: DataTypes.STRING(100),
       allowNull: false,
+      defaultValue: 'Dhaka',
     },
     address: {
       type: DataTypes.TEXT,
@@ -77,7 +88,7 @@ const Property = sequelize.define(
       allowNull: true,
     },
     floor: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(50),
       allowNull: true,
     },
     totalFloors: {
@@ -102,6 +113,10 @@ const Property = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
+    map: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+    },
     contactNumber: {
       type: DataTypes.STRING(20),
       allowNull: false,
@@ -119,10 +134,45 @@ const Property = sequelize.define(
       type: DataTypes.STRING(100),
       allowNull: true,
     },
+    ownerName: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    ownerPhone: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    visit: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
     photos: {
       type: DataTypes.JSON,
       allowNull: true,
       defaultValue: [],
+    },
+    floorPlan: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+    },
+    videoUrl: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+    },
+    documents: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: [],
+    },
+    mx: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: {},
+    },
+    vt: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: {},
     },
     status: {
       type: DataTypes.ENUM(PROPERTY_STATUS.PENDING, PROPERTY_STATUS.VERIFIED, PROPERTY_STATUS.MATCHED),

@@ -56,6 +56,15 @@ const MatchController = {
     }
   },
 
+  async requestViewing(req, res) {
+    try {
+      const match = await MatchService.requestViewing(req.params.id, req.user.id, req.body);
+      return successResponse(res, match, 'Viewing request sent to seller successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
   async acceptBuyerMatch(req, res) {
     try {
       const match = await MatchService.acceptBuyerMatch(req.params.id, req.user.id);
@@ -78,6 +87,24 @@ const MatchController = {
     try {
       const siteVisits = await MatchService.getBuyerSiteVisits(req.user.id);
       return successResponse(res, siteVisits, 'Site visits fetched successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
+  async confirmSiteVisit(req, res) {
+    try {
+      const visit = await MatchService.confirmSiteVisit(req.params.id, req.user.id);
+      return successResponse(res, visit, 'Site visit confirmed successfully');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
+  async proposeNewTime(req, res) {
+    try {
+      const visit = await MatchService.proposeNewTime(req.params.id, req.user.id, req.body);
+      return successResponse(res, visit, 'New time proposed to buyer');
     } catch (error) {
       return errorResponse(res, error.message, error.status || 500);
     }
