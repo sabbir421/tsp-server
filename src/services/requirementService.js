@@ -134,29 +134,8 @@ const normalizePayload = (body) => {
 
 const RequirementService = {
   async create(buyerId, body) {
-    let finalBuyerId = buyerId;
-    if (!finalBuyerId) {
-      const { BuyerTenant } = require('../schema');
-      const bcrypt = require('bcryptjs');
-      const phone = body.phone?.trim() || '01700000000';
-      let buyer = await BuyerTenant.findOne({ where: { phone } });
-      if (!buyer) {
-        const email = body.email?.trim() || `buyer_${Date.now()}_${Math.floor(Math.random() * 1000)}@truespace.com.bd`;
-        const hashedPassword = await bcrypt.hash('123456', 10);
-        buyer = await BuyerTenant.create({
-          fullName: body.name?.trim() || 'Verified Buyer',
-          email,
-          phone,
-          password: hashedPassword,
-          isPhoneVerified: true,
-          verificationStatus: 'verified',
-        });
-      }
-      finalBuyerId = buyer.id;
-    }
-
     const data = normalizePayload(body);
-    const id = await RequirementModel.create({ ...data, buyerId: finalBuyerId });
+    const id = await RequirementModel.create({ ...data, buyerId });
     const record = await RequirementModel.findById(id);
     return formatRequirement(record);
   },

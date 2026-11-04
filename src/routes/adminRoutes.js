@@ -1,20 +1,15 @@
 const express = require('express');
 const AdminController = require('../controller/adminController');
 const { authenticate } = require('../middleware/authMiddleware');
+const { adminOnly } = require('../middleware/adminMiddleware');
 
 const router = express.Router();
 
 // Public Admin Auth
 router.post('/login', AdminController.login);
 
-// Protected Admin Routes (Accepts bearer token or admin token)
-router.use((req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authenticate(req, res, next);
-  }
-  next();
-});
+// Protected Admin Routes
+router.use(authenticate, adminOnly);
 
 router.get('/stats', AdminController.getDashboardStats);
 router.get('/users', AdminController.getUsers);

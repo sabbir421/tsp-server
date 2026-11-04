@@ -10,47 +10,15 @@ const AdminController = {
       const { email, password } = req.body;
       const cleanEmail = (email || '').toLowerCase().trim();
 
-      // Check AdminUser database table first
-      if (AdminUser) {
-        try {
-          const dbAdmin = await AdminUser.findOne({ where: { email: cleanEmail } });
-          if (dbAdmin) {
-            const isMatch = await bcrypt.compare(password, dbAdmin.password);
-            if (isMatch) {
-              const token = generateToken({ id: dbAdmin.id, role: 'admin', email: dbAdmin.email });
-              return successResponse(res, {
-                token,
-                user: {
-                  id: dbAdmin.id,
-                  fullName: dbAdmin.fullName,
-                  email: dbAdmin.email,
-                  role: 'admin',
-                },
-              }, 'Admin login successful');
-            }
-          }
-        } catch (dbErr) {
-          console.warn('AdminUser table query fallback:', dbErr.message);
-        }
-      }
-
-      // Fallback static credentials
-      const validAdmins = [
-        { email: 'sabbiralazim@gmail.com', pass: '123456', name: 'Sabbir Al Azim' },
-        { email: 'admin@truespaceproperty.com', pass: 'admin123456', name: 'Platform Administrator' },
-        { email: (process.env.ADMIN_EMAIL || '').toLowerCase(), pass: process.env.ADMIN_PASSWORD, name: 'Admin User' },
-      ];
-
-      const match = validAdmins.find((a) => a.email && a.email.toLowerCase() === cleanEmail && a.pass === password);
-
-      if (match) {
-        const token = generateToken({ id: 999999, role: 'admin', email: match.email });
+      const dbAdmin = await AdminUser.findOne({ where: { email: cleanEmail } });
+      if (dbAdmin && dbAdmin.isActive && typeof password === 'string' && await bcrypt.compare(password, dbAdmin.password)) {
+        const token = generateToken({ id: dbAdmin.id, role: 'admin', email: dbAdmin.email });
         return successResponse(res, {
           token,
           user: {
-            id: 999999,
-            fullName: match.name,
-            email: match.email,
+            id: dbAdmin.id,
+            fullName: dbAdmin.fullName,
+            email: dbAdmin.email,
             role: 'admin',
           },
         }, 'Admin login successful');
@@ -72,21 +40,6 @@ const AdminController = {
           attributes: { exclude: ['password'] },
           order: [['createdAt', 'DESC']],
         });
-      }
-
-      // Always include default admin in list if not already present
-      const defaultAdmin = {
-        id: 999999,
-        fullName: 'Sabbir Al Azim',
-        email: 'sabbiralazim@gmail.com',
-        role: 'super_admin',
-        isActive: true,
-        createdAt: new Date(),
-      };
-
-      const hasDefault = admins.some((a) => a.email.toLowerCase() === defaultAdmin.email.toLowerCase());
-      if (!hasDefault) {
-        admins.unshift(defaultAdmin);
       }
 
       return successResponse(res, admins, 'Admins fetched successfully');
@@ -135,11 +88,15 @@ const AdminController = {
   async deleteAdmin(req, res) {
     try {
       const { id } = req.params;
-      if (Number(id) === 999999) {
+      if (Number(id) === Number(req.user.id)) {
+        return errorResponse(res, 'You cannot delete your own admin account', 400);
+      }
+      const target = await AdminUser.findByPk(id);
+      if (target?.role === 'super_admin') {
         return errorResponse(res, 'Cannot delete primary root super admin account', 400);
       }
-      if (AdminUser) {
-        await AdminUser.destroy({ where: { id } });
+      if (target) {
+        await target.destroy();
       }
       return successResponse(res, null, 'Admin account deleted successfully');
     } catch (err) {

@@ -113,6 +113,7 @@ const startServer = async () => {
     console.log("Database synced successfully");
     const seedData = require("./utils/seedPrototypeData");
     await seedData();
+    await require("./utils/ensureAdmin")();
   } catch (error) {
     console.error("Database connection/sync warning:", error.message);
   }
