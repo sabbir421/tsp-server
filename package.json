@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "predev": "lsof -ti:8000 | xargs kill -9 2>/dev/null || true",
+    "predev": "node scripts/free-port.js 8000",
     "dev": "nodemon src/index.js",
     "db:init": "node src/utils/initDb.js"
   },

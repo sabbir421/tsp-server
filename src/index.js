@@ -97,7 +97,7 @@ const startServer = async () => {
   server.on("error", (error) => {
     if (error.code === "EADDRINUSE") {
       console.error(
-        `Port ${PORT} is already in use. Run: lsof -ti:${PORT} | xargs kill -9`
+        `Port ${PORT} is already in use. Run: node scripts/free-port.js ${PORT}`
       );
       console.error("Or set a different PORT in server/.env");
     } else {
@@ -109,7 +109,9 @@ const startServer = async () => {
   try {
     await sequelize.authenticate();
     console.log("MySQL connected successfully");
-    await sequelize.sync({ alter: true });
+    // alter: true adds duplicate unique indexes on every run (MySQL caps tables at 64 keys).
+    // Only alter when explicitly asked: DB_SYNC_ALTER=true npm run dev
+    await sequelize.sync(process.env.DB_SYNC_ALTER === "true" ? { alter: true } : {});
     console.log("Database synced successfully");
     const seedData = require("./utils/seedPrototypeData");
     await seedData();

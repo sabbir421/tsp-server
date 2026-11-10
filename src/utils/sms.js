@@ -1,8 +1,9 @@
+const https = require('https');
+const querystring = require('querystring');
 const { OTP_TYPES } = require('../constants');
 const { toSmsRecipient } = require('./phone');
 
 const SMS_API_URL = process.env.SMS_NET_BD_URL || 'https://api.sms.net.bd/sendsms';
-const DEFAULT_SENDER_ID = 'TSP';
 const BRAND = 'TSP';
 
 const OTP_SMS_COPY = {
@@ -26,31 +27,60 @@ const parseSmsResponse = (raw) => {
 
 const getSenderId = () => {
   const configured = process.env.SMS_NET_BD_SENDER_ID;
-  if (configured === '') return DEFAULT_SENDER_ID;
-  if (configured && configured.toLowerCase() !== 'none') return configured;
-  return DEFAULT_SENDER_ID;
+  if (!configured || configured.toLowerCase() === 'none' || configured === 'TSP' || configured === 'DEFAULT') {
+    return null;
+  }
+  return configured.trim();
 };
 
-const postSms = async ({ apiKey, msg, to, senderId }) => {
-  const form = new URLSearchParams();
-  form.append('api_key', apiKey);
-  form.append('msg', msg);
-  form.append('to', to);
-  if (senderId) {
-    form.append('sender_id', senderId);
-  }
+const postSms = ({ apiKey, msg, to, senderId }) => {
+  return new Promise((resolve, reject) => {
+    const postData = querystring.stringify({
+      api_key: apiKey,
+      msg,
+      to,
+      ...(senderId ? { sender_id: senderId } : {}),
+    });
 
-  const response = await fetch(SMS_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: form.toString(),
+    const url = new URL(SMS_API_URL);
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + (url.search || ''),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+        timeout: 10000,
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          const payload = parseSmsResponse(data);
+          const errorCode = Number(payload.error);
+          const failed =
+            res.statusCode < 200 ||
+            res.statusCode >= 300 ||
+            (Number.isFinite(errorCode) && errorCode !== 0);
+          resolve({ payload, errorCode, failed });
+        });
+      }
+    );
+
+    req.on('timeout', () => {
+      req.destroy(new Error('SMS request timed out'));
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+
+    req.write(postData);
+    req.end();
   });
-
-  const payload = parseSmsResponse(await response.text());
-  const errorCode = Number(payload.error);
-  const failed = !response.ok || (Number.isFinite(errorCode) && errorCode !== 0);
-
-  return { payload, errorCode, failed };
 };
 
 const sendOtpSms = async ({ phone, countryCode, otpCode, purpose }) => {
@@ -61,13 +91,10 @@ const sendOtpSms = async ({ phone, countryCode, otpCode, purpose }) => {
   const apiKey = process.env.SMS_NET_BD_API_KEY;
   const senderId = getSenderId();
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[DEV] SMS OTP to ${to} from ${senderId}:\n${msg}`);
-  }
-
   if (!apiKey || apiKey === 'YOUR_API_KEY') {
     if (process.env.NODE_ENV === 'development') {
-      return { skipped: true };
+      console.warn(`[DEV] SMS API key not configured. Use this OTP in UI: ${otpCode}`);
+      return { skipped: true, simulated: true, otpCode };
     }
     throw { status: 500, message: 'SMS provider is not configured' };
   }
@@ -75,19 +102,29 @@ const sendOtpSms = async ({ phone, countryCode, otpCode, purpose }) => {
   try {
     let result = await postSms({ apiKey, msg, to, senderId });
 
-    // 413 = unapproved / invalid sender ID — retry so OTP still goes out
+    // 413 = unapproved / invalid sender ID — retry without header
     if (result.failed && result.errorCode === 413 && senderId) {
-      console.warn(`SMS sender ID "${senderId}" was rejected. Retrying without header.`);
+      console.warn(`SMS sender ID "${senderId}" was rejected. Retrying without sender_id.`);
       result = await postSms({ apiKey, msg, to, senderId: null });
     }
 
     if (result.failed) {
-      console.error('Failed to send OTP SMS:', result.payload);
+      console.error('Failed to send OTP SMS (provider rejected):', result.payload);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[DEV FALLBACK] SMS provider returned an error, but OTP code is active: ${otpCode}`);
+        return { skipped: true, simulated: true, otpCode };
+      }
       throw new Error(result.payload.msg || 'SMS provider rejected the request');
     }
+
+    return { success: true, payload: result.payload };
   } catch (error) {
     if (error.status) throw error;
     console.error('Failed to send OTP SMS:', error.message);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[DEV FALLBACK] Network / fetch error occurred, but OTP code is active: ${otpCode}`);
+      return { skipped: true, simulated: true, otpCode };
+    }
     throw { status: 502, message: 'Failed to send verification SMS. Please try again later.' };
   }
 };
