@@ -356,7 +356,7 @@ const PropertyService = {
   },
 
   async getPublicById(id) {
-    const property = await PropertyModel.findById(id);
+    const property = await PropertyModel.findPublicById(id);
     if (!property) {
       throw { status: 404, message: 'Property not found' };
     }

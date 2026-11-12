@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { BuyerTenant, SellerAgent, Property, Requirement, PropertyMatch, OtpCode, AdminUser } = require('../schema');
+const { PROPERTY_STATUS } = require('../schema/propertySchema');
 const { generateToken } = require('../utils/jwt');
 const { successResponse, errorResponse } = require('../utils/response');
 
@@ -341,6 +342,9 @@ const AdminController = {
     try {
       const { id } = req.params;
       const { status } = req.body;
+      if (!Object.values(PROPERTY_STATUS).includes(status)) {
+        return errorResponse(res, `Status must be one of: ${Object.values(PROPERTY_STATUS).join(', ')}`, 400);
+      }
       const property = await Property.findByPk(id);
       if (!property) return errorResponse(res, 'Property not found', 404);
 

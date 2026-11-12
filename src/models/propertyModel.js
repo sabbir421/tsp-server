@@ -1,6 +1,9 @@
 const { Op } = require('sequelize');
 const { Property } = require('../schema');
 
+// Statuses visible to buyers. Pending listings stay hidden until an admin verifies them.
+const PUBLIC_STATUSES = ['verified', 'matched'];
+
 const toPlain = (record) => (record?.get ? record.get({ plain: true }) : record);
 
 const PropertyModel = {
@@ -11,6 +14,10 @@ const PropertyModel = {
 
   async findById(id) {
     return Property.findByPk(id);
+  },
+
+  async findPublicById(id) {
+    return Property.findOne({ where: { id, status: { [Op.in]: PUBLIC_STATUSES } } });
   },
 
   async findByIdAndSeller(id, sellerId) {
@@ -27,7 +34,7 @@ const PropertyModel = {
   async findAllAvailable() {
     return Property.findAll({
       where: {
-        status: { [Op.in]: ['verified', 'pending', 'matched'] },
+        status: { [Op.in]: PUBLIC_STATUSES },
       },
       order: [['createdAt', 'DESC']],
     });
