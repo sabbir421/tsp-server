@@ -222,6 +222,19 @@ const validatePropertyData = (data) => {
   if (!data.price || data.price <= 0) throw { status: 400, message: 'Valid price is required' };
 };
 
+// Upload Photo/Video verification files (fieldname vt_*) to S3 and append them to vt.photo.files
+const addVerificationPhotos = async (vt, files, existingFiles = []) => {
+  const vtFiles = (files || []).filter((f) => f.fieldname.startsWith('vt_'));
+  const uploaded = await Promise.all(
+    vtFiles.map(async (file) => ({
+      name: file.originalname,
+      url: await uploadMulterFile(file, 'verification'),
+    }))
+  );
+  const photo = vt.photo || {};
+  return { ...vt, photo: { ...photo, on: true, files: [...existingFiles, ...uploaded] } };
+};
+
 const PropertyService = {
   async create(sellerId, body, files) {
     const data = normalizeBody(body);
@@ -250,17 +263,11 @@ const PropertyService = {
       if (fpFiles.length) {
         floorPlan = await uploadMulterFile(fpFiles[0], 'floorplans');
       }
+    }
 
-      // Handle any verification tag files
-      const vtFiles = files.filter((f) => f.fieldname.startsWith('vt_'));
-      if (vtFiles.length && data.vt) {
-        for (const file of vtFiles) {
-          const uploadedUrl = await uploadMulterFile(file, 'verification');
-          // Add to data.vt structure if needed
-          data.vt.uploadedUrls = data.vt.uploadedUrls || [];
-          data.vt.uploadedUrls.push({ name: file.originalname, url: uploadedUrl });
-        }
-      }
+    data.vt = await addVerificationPhotos(data.vt, files);
+    if (!data.vt.photo.files.length) {
+      throw { status: 400, message: 'At least one Photo/Video verification photo is required' };
     }
 
     const propertyId = await PropertyModel.create({
@@ -299,6 +306,12 @@ const PropertyService = {
     validatePropertyData(data);
 
     const existingData = toPlain(existing);
+    const existingVt = parseJsonField(existingData.vt, {});
+    data.vt = await addVerificationPhotos(
+      { ...existingVt, ...data.vt },
+      files,
+      existingVt.photo?.files || []
+    );
     let photos = parseJsonField(existingData.photos, []);
     let documents = parseJsonField(existingData.documents, []);
     let floorPlan = existingData.floorPlan;

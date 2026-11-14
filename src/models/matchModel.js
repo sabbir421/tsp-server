@@ -60,10 +60,10 @@ const MatchModel = {
     return PropertyMatch.findAll({
       where: {
         sellerId,
+        // visitStatus defaults to 'pending', so only count rows the buyer actually requested
         [Op.or]: [
           { visitRequested: true },
-          { status: 'interested' },
-          { visitStatus: { [Op.in]: ['pending', 'confirmed', 'completed', 'rescheduled'] } },
+          { visitStatus: { [Op.in]: ['confirmed', 'completed', 'rescheduled', 'declined'] } },
         ],
       },
       order: [['updatedAt', 'DESC']],
@@ -74,10 +74,10 @@ const MatchModel = {
     return PropertyMatch.findAll({
       where: {
         buyerId,
+        // visitStatus defaults to 'pending', so only count rows the buyer actually requested
         [Op.or]: [
           { visitRequested: true },
-          { status: 'interested' },
-          { visitStatus: { [Op.in]: ['pending', 'confirmed', 'completed', 'rescheduled'] } },
+          { visitStatus: { [Op.in]: ['confirmed', 'completed', 'rescheduled', 'declined'] } },
         ],
       },
       order: [['updatedAt', 'DESC']],

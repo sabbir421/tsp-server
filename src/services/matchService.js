@@ -149,6 +149,17 @@ const computeMatchScore = (requirement, property) => {
   return Math.min(score, 98);
 };
 
+const setSellerVisitStatus = async (id, visitStatus) => {
+  await MatchModel.updateVisitStatus(id, visitStatus);
+  const updated = toPlain(await MatchModel.findById(id));
+  if (!updated || updated.visitStatus !== visitStatus) {
+    const err = new Error(`Visit status could not be saved as "${visitStatus}". Please try again.`);
+    err.status = 500;
+    throw err;
+  }
+  return updated;
+};
+
 const MatchService = {
   async getActiveRequirements(sellerId) {
     const rawRequirements = await RequirementModel.findAllActive();
@@ -590,9 +601,19 @@ const MatchService = {
       throw err;
     }
 
-    await MatchModel.updateVisitStatus(id, VISIT_STATUS.CONFIRMED);
-    const updated = await MatchModel.findById(id);
-    return toPlain(updated);
+    return setSellerVisitStatus(id, VISIT_STATUS.CONFIRMED);
+  },
+
+  async declineSiteVisit(matchId, sellerId) {
+    const id = Number(matchId);
+    const record = await MatchModel.findByIdAndSeller(id, sellerId);
+    if (!record) {
+      const err = new Error('Visit request not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return setSellerVisitStatus(id, VISIT_STATUS.DECLINED);
   },
 
   async proposeNewTime(matchId, sellerId, body) {

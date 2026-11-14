@@ -101,6 +101,15 @@ const MatchController = {
     }
   },
 
+  async declineSiteVisit(req, res) {
+    try {
+      const visit = await MatchService.declineSiteVisit(req.params.id, req.user.id);
+      return successResponse(res, visit, 'Site visit declined');
+    } catch (error) {
+      return errorResponse(res, error.message, error.status || 500);
+    }
+  },
+
   async proposeNewTime(req, res) {
     try {
       const visit = await MatchService.proposeNewTime(req.params.id, req.user.id, req.body);

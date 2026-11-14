@@ -15,6 +15,7 @@ router.post('/', sellerOnly, MatchController.create);
 router.get('/seller/mine', sellerOnly, MatchController.getSellerMatches);
 router.get('/seller/site-visits', sellerOnly, MatchController.getSellerSiteVisits);
 router.patch('/seller/:id/confirm-visit', sellerOnly, MatchController.confirmSiteVisit);
+router.patch('/seller/:id/decline-visit', sellerOnly, MatchController.declineSiteVisit);
 router.patch('/seller/:id/propose-time', sellerOnly, MatchController.proposeNewTime);
 router.patch('/seller/:id/complete-visit', sellerOnly, MatchController.completeSiteVisit);
 

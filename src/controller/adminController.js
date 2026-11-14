@@ -311,6 +311,7 @@ const AdminController = {
           ...data,
           photos: Array.isArray(photos) ? photos : [],
           documents: Array.isArray(documents) ? documents : [],
+          vt: parseJson(data.vt, {}),
           contactNumber: data.contactNumber || seller?.phone || 'N/A',
           ownerName: data.ownerName || seller?.fullName || 'Property Owner',
           sellerName: seller?.fullName || 'Seller',
